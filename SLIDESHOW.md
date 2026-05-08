@@ -98,10 +98,16 @@ Below it: a 3-up screenshot strip — Dashboard, SessionDetail (Commit screen wi
 
 **Visual:** Screenshot of an actual Solana Explorer page (`https://explorer.solana.com/tx/<sig>?cluster=devnet`) for one of your `commit` transactions. Annotate with a callout arrow pointing to the memo payload showing `{type: "session_commitment", manifestHash: "...", ...}`.
 
-**Body:** Three transaction signatures in monospace, each clickable in the live deck:
-- `commit:` `<sig>`
-- `grant:` `<sig>`
-- `revoke:` `<sig>`
+**Body:** Three real transaction signatures from devnet (captured 2026-05-08 from wallet `BrKt8mtkQdNno34YJYttxQXVHtNUYEcYQPP78wsjut2y`), each clickable in the live deck:
+
+- `commit:` `3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS`
+  → https://explorer.solana.com/tx/3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS?cluster=devnet
+- `grant:`  `4w4DDVo96ToCKnzhAJiDEFXzggcc76Fh5SQsqeGBG8rUHVAez485or2zb3iMuahBvF1cCDu1NxfeGwNczA9RDNko`
+  → https://explorer.solana.com/tx/4w4DDVo96ToCKnzhAJiDEFXzggcc76Fh5SQsqeGBG8rUHVAez485or2zb3iMuahBvF1cCDu1NxfeGwNczA9RDNko?cluster=devnet
+- `revoke:` `LFu7qHkF7ssZoRkFc2fEKtfFaD3KBb4B1puP5e8AkS9i5EkXzcS13uiSYoa8VRw5FWxBEHo92t7VaF234iBfFAG`
+  → https://explorer.solana.com/tx/LFu7qHkF7ssZoRkFc2fEKtfFaD3KBb4B1puP5e8AkS9i5EkXzcS13uiSYoa8VRw5FWxBEHo92t7VaF234iBfFAG?cluster=devnet
+
+QR-code each link in the deck so a judge can scan straight from the slide.
 
 **This slide is your single biggest differentiator vs. the average submission. Spend the time to make the screenshot crisp.**
 
@@ -150,7 +156,7 @@ Below it: a 3-up screenshot strip — Dashboard, SessionDetail (Commit screen wi
 **Body:** Your wearable data. Your consent. On Solana.
 
 **Visual:** Same as cover but with a row of links at the bottom (small text, all on one line):
-`github.com/<you>/healthlog · Loom: <demo-url> · explorer.solana.com/tx/<sig>?cluster=devnet`
+`github.com/Libritor/HealthLog · Loom: <demo-url> · explorer.solana.com/tx/3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS?cluster=devnet`
 
 Below: "Frontier Hackathon · Submission #_____"
 

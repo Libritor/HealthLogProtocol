@@ -69,7 +69,10 @@ The devnet airdrop has been silently failing, so commits return `devnet_fallback
 ## What still needs you (the human)
 
 ### Tonight
-- [ ] **Rebuild and capture three real devnet signatures** (see "Right now" above). Pin them into README, slide 6, submission.
+- [x] **Three real devnet signatures captured 2026-05-08** from wallet `BrKt8mtkQdNno34YJYttxQXVHtNUYEcYQPP78wsjut2y` (1 SOL faucet-funded). Pinned in `README.md` "On-chain proof" section and `SLIDESHOW.md` slide 6. Screenshots `102_after_commit_tap.png` (Tx Signature shows `3b8JsC6BUdsWrAYy...`), `108_token_card_revoke.png` (token ACTIVE with grant tx), `109_after_revoke.png` (token REVOKED).
+  - commit: `3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS`
+  - grant:  `4w4DDVo96ToCKnzhAJiDEFXzggcc76Fh5SQsqeGBG8rUHVAez485or2zb3iMuahBvF1cCDu1NxfeGwNczA9RDNko`
+  - revoke: `LFu7qHkF7ssZoRkFc2fEKtfFaD3KBb4B1puP5e8AkS9i5EkXzcS13uiSYoa8VRw5FWxBEHo92t7VaF234iBfFAG`
 - [x] Take 5 clean screenshots — golden-set captured 2026-05-08 in `screenshots/`:
   - **Dashboard with full demo flow ribbon**: `79_dashboard.png` (Import → Encrypt → Hash → Commit → Summarize → Grant → Verify all green, Verify chip highlighted purple)
   - **Session Detail (encrypted + committed + generated)**: `69_after_commit2.png` (all 3 status pills, real wallet owner, mock devnet tx signature, View on Solana Explorer link)

@@ -46,6 +46,20 @@ Import -> Encrypt -> Hash -> Commit -> Summarize -> Grant -> Verify -> Revoke
 
 Every signature is real (or, on RPC failure, marked as a `devnet_fallback_*` placeholder so demos don't stall). The Mock mode is identical UX with synthetic signatures, for offline judging or air-gapped review.
 
+## On-chain proof (Solana devnet, 2026-05-08)
+
+Three real signed memo-program transactions from one demo run, on-chain on Solana devnet. The wallet is deterministically derived from a persisted seed in `flutter_secure_storage` (HD path `m/44'/501'/0'/0'`) and was funded with 1 SOL via the public devnet faucet.
+
+**Wallet:** [`BrKt8mtkQdNno34YJYttxQXVHtNUYEcYQPP78wsjut2y`](https://explorer.solana.com/address/BrKt8mtkQdNno34YJYttxQXVHtNUYEcYQPP78wsjut2y?cluster=devnet)
+
+| Step | Tx signature | Solana Explorer |
+| --- | --- | --- |
+| 1. Commit session provenance | `3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS` | [view](https://explorer.solana.com/tx/3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS?cluster=devnet) |
+| 2. Issue Data Access Token (grant) | `4w4DDVo96ToCKnzhAJiDEFXzggcc76Fh5SQsqeGBG8rUHVAez485or2zb3iMuahBvF1cCDu1NxfeGwNczA9RDNko` | [view](https://explorer.solana.com/tx/4w4DDVo96ToCKnzhAJiDEFXzggcc76Fh5SQsqeGBG8rUHVAez485or2zb3iMuahBvF1cCDu1NxfeGwNczA9RDNko?cluster=devnet) |
+| 3. Revoke on-chain | `LFu7qHkF7ssZoRkFc2fEKtfFaD3KBb4B1puP5e8AkS9i5EkXzcS13uiSYoa8VRw5FWxBEHo92t7VaF234iBfFAG` | [view](https://explorer.solana.com/tx/LFu7qHkF7ssZoRkFc2fEKtfFaD3KBb4B1puP5e8AkS9i5EkXzcS13uiSYoa8VRw5FWxBEHo92t7VaF234iBfFAG?cluster=devnet) |
+
+Each transaction's memo payload is a JSON envelope (`{type, manifestHash, rawFileHash, owner, recipient, scope, purpose, expiry, ts}`) so the chain itself carries the consent semantics — no off-chain index required to reconstruct the audit trail.
+
 ## What's real now
 
 - **MuseLog ingest**: import any `muse_session_*.csv` (Muse 2 / Muse S / Muse S Athena). Live BLE recording also wired through the existing platform-channel scaffolding.
