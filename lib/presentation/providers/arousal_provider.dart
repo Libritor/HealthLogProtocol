@@ -265,9 +265,7 @@ Stream<ArousalSample> _createArousalStreamFromBandPowers(
 /// Stream provider for arousal analysis results
 /// Uses band powers for more reliable real-time analysis
 final arousalStreamProvider = StreamProvider.family<ArousalSample, String>((ref, deviceId) {
-  // Use band power stream which is more reliable than raw EEG
-  final bandPowerStream = ref.read(bandPowerStreamProvider(deviceId).stream);
-  
-  // Create arousal stream from band powers
+  final museService = ref.read(museServiceProvider);
+  final bandPowerStream = museService.subscribeToBandPowers(deviceId);
   return _createArousalStreamFromBandPowers(bandPowerStream);
 });

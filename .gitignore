@@ -69,3 +69,65 @@ app.*.map.json
 
 # Linux
 *.so
+
+# IDE / agent tooling
+.cursor/
+cursor-selection-system/
+.gemini/
+
+# Python compute artifacts (separate from HealthLog)
+__pycache__/
+*.pyc
+
+# MuseLog AI paper artifacts (large, separate concern)
+SteveMann_head.stl
+SteveMann_head.stp
+figures/
+figures_supp/
+figures_wide/
+freq_curve.txt
+devices.txt
+
+# Debug logs / dev scratch
+analyze_*.txt
+analyze_snow_plunge.py
+build_error*.txt
+compute_row.py
+compute_wide.py
+diagnose_freq*.py
+generate_mindmesh_gcode.py
+test_osc.py
+_screenshot_*.png
+
+# 3D print / cap design artifacts (separate concern)
+mindmesh_cap*
+*.gcode
+*.step
+*.stl
+*.stp
+*.zip
+
+# Paper compute scripts + outputs (separate concern)
+plot_wide_maps.py
+project1_fhn_deliverables/
+project1_fhn_response_maps.py
+regen_v2_plots.py
+replot_maps.py
+results/
+results_wide/
+run_batch.py
+run_err_*.txt
+run_log*.txt
+run_wide_*.py
+run_wrapper.py
+snow_plunge_*
+supplemental_analysis.py
+
+# Next.js build artifacts
+nextjs_frontend/.next/
+nextjs_frontend/node_modules/
+nextjs_frontend/out/
+
+# Backend / unrelated dirs
+backend_logic/
+__pycache__

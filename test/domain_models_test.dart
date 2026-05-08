@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:muse_headband_app/core/constants.dart';
-import 'package:muse_headband_app/domain/models/muse_device.dart';
-import 'package:muse_headband_app/domain/models/eeg_sample.dart';
-import 'package:muse_headband_app/domain/models/band_power_sample.dart';
+import 'package:healthlog/core/constants.dart';
+import 'package:healthlog/domain/models/muse_device.dart';
+import 'package:healthlog/domain/models/eeg_sample.dart';
+import 'package:healthlog/domain/models/band_power_sample.dart';
 import 'package:flutter/material.dart';
 
 void main() {

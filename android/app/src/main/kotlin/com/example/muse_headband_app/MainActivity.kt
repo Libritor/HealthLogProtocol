@@ -20,6 +20,9 @@ class MainActivity: FlutterActivity() {
     
     private lateinit var museManager: MuseManagerAndroid
     private val connectedMuses = mutableMapOf<String, Muse>()
+    // Cache discovered Muse objects by MAC address so we can connect to them
+    // even after the SDK's internal getMuses() list changes.
+    private val discoveredMuses = mutableMapOf<String, Muse>()
     
     // Event Sinks
     private var scanEventSink: EventChannel.EventSink? = null
@@ -43,11 +46,15 @@ class MainActivity: FlutterActivity() {
             val muses = museManager.getMuses()
             Log.d("MuseSDK", "Muse list changed. Found ${muses.size} devices.")
             muses.forEach { muse ->
-                Log.d("MuseSDK", "Discovered: ${muse.getName()} - ${muse.getMacAddress()}")
+                val mac = muse.getMacAddress()
+                Log.d("MuseSDK", "Discovered: ${muse.getName()} - $mac")
+                // Cache the Muse object so we can still connect later even if
+                // the SDK's getMuses() list changes after a first connection.
+                discoveredMuses[mac] = muse
                 val deviceData = mapOf(
-                    "id" to muse.getMacAddress(),
+                    "id" to mac,
                     "name" to muse.getName(),
-                    "battery" to 0.0  // Placeholder, real battery comes from BATTERY packet
+                    "battery" to 0.0
                 )
                 runOnUiThread {
                     scanEventSink?.success(deviceData)
@@ -56,10 +63,16 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    // Listener for connection state changes
     private val connectionListener = object : MuseConnectionListener() {
         override fun receiveMuseConnectionPacket(packet: MuseConnectionPacket, muse: Muse?) {
-            Log.d("MuseSDK", "Connection state: ${packet.currentConnectionState}")
+            val deviceId = muse?.getMacAddress() ?: "unknown"
+            val state = packet.currentConnectionState
+            Log.d("MuseSDK", "Connection state for $deviceId: $state")
+            if (state == ConnectionState.DISCONNECTED) {
+                connectedMuses.remove(deviceId)
+                bandPowerBuffers.remove(deviceId)
+                deviceHsiState.remove(deviceId)
+            }
         }
     }
 
@@ -331,6 +344,7 @@ class MainActivity: FlutterActivity() {
             when (call.method) {
                 "scan" -> {
                     museManager.stopListening()
+                    discoveredMuses.clear()
                     museManager.startListening()
                     result.success(null)
                 }
@@ -341,7 +355,9 @@ class MainActivity: FlutterActivity() {
                 "connect" -> {
                     val deviceId = call.argument<String>("deviceId")
                     if (deviceId != null) {
-                        val muse = museManager.getMuses().find { it.getMacAddress() == deviceId }
+                        // Look up from our cache first, fall back to live list.
+                        val muse = discoveredMuses[deviceId]
+                            ?: museManager.getMuses().find { it.getMacAddress() == deviceId }
                         if (muse != null) {
                             muse.unregisterAllListeners()
                             muse.registerConnectionListener(connectionListener)
@@ -444,10 +460,13 @@ class MainActivity: FlutterActivity() {
                 }
                 "disconnect" -> {
                     val deviceId = call.argument<String>("deviceId")
-                    connectedMuses[deviceId]?.disconnect()
-                    connectedMuses.remove(deviceId)
-                    bandPowerBuffers.remove(deviceId)
-                    deviceHsiState.remove(deviceId)
+                    if (deviceId != null) {
+                        connectedMuses[deviceId]?.disconnect()
+                        connectedMuses.remove(deviceId)
+                        discoveredMuses.remove(deviceId)
+                        bandPowerBuffers.remove(deviceId)
+                        deviceHsiState.remove(deviceId)
+                    }
                     result.success(null)
                 }
                 else -> result.notImplemented()

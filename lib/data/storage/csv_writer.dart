@@ -6,17 +6,20 @@ import '../../domain/models/band_power_sample.dart';
 import '../../domain/models/fnirs_sample.dart';
 import '../../domain/models/imu_sample.dart';
 import '../../domain/models/muse_device.dart';
-import '../../domain/models/arousal_sample.dart';
 
 // Writes sensor data to CSV incrementally (no buffering entire session).
+// Flushes to disk every _flushInterval rows so data survives app crashes.
 class CsvWriter {
   final File file;
   final List<String> selectedColumns;
   final IOSink _sink;
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss.SSS');
 
+  static const int _flushInterval = 256;
+
   DateTime? _sessionStartTime;
   int _triggerCount = 0;
+  int _rowsSinceFlush = 0;
   bool _headerWritten = false;
 
   CsvWriter._(this.file, this.selectedColumns, this._sink);
@@ -46,7 +49,6 @@ class CsvWriter {
     BandPowerSample? bandPowerSample,
     FnirsSample? fnirsSample,
     ImuSample? imuSample,
-    ArousalSample? arousalSample,
   }) async {
     if (!_headerWritten) {
       await writeHeader();
@@ -85,15 +87,18 @@ class CsvWriter {
     if (imuSample != null) {
       allValues.addAll(imuSample.toCsvValues());
     }
-    if (arousalSample != null) {
-      allValues.addAll(arousalSample.toCsvValues());
-    }
 
     final row = selectedColumns.map((col) => allValues[col] ?? '').toList();
 
     final csvConverter = const ListToCsvConverter();
     final csvRow = csvConverter.convert([row]);
     _sink.write(csvRow + '\r\n');
+
+    _rowsSinceFlush++;
+    if (_rowsSinceFlush >= _flushInterval) {
+      _rowsSinceFlush = 0;
+      _sink.flush();
+    }
   }
 
   void incrementTrigger() {

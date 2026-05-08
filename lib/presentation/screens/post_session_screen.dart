@@ -2,9 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../data/adapters/muselog_adapter.dart';
 import '../../data/storage/file_storage_helper.dart';
+import '../../domain/models/solana_models.dart';
 import '../providers/recording_provider.dart';
+import '../providers/solana_providers.dart';
 import 'device_selection_screen.dart';
+import 'healthlog_dashboard_screen.dart';
+import 'session_detail_screen.dart';
 
 /// Post-session summary screen
 /// Shows recording summary and allows sharing CSV files
@@ -18,6 +23,8 @@ class PostSessionScreen extends ConsumerStatefulWidget {
 class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
   List<File>? _sessionFiles;
   bool _isLoading = true;
+  String? _importedSessionId;
+  bool _healthLogBusy = false;
 
   @override
   void initState() {
@@ -27,11 +34,148 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
 
   Future<void> _loadSessionFiles() async {
     final files = await FileStorageHelper.listSessionFiles();
+    final allFiles = <File>[...files.take(15)];
+
+    final config = ref.read(sessionConfigProvider);
+    if (config != null && config.includeRayBan) {
+      for (final path in config.raybanMediaPaths) {
+        final file = File(path);
+        if (await file.exists()) {
+          allFiles.add(file);
+        }
+      }
+    }
+
     setState(() {
-      // Get the most recent files (last recording)
-      _sessionFiles = files.take(15).toList(); // Show last 15 files
+      _sessionFiles = allFiles;
       _isLoading = false;
     });
+  }
+
+  Future<WearableSession?> _ensureImported() async {
+    if (_importedSessionId != null) {
+      return ref.read(sessionsProvider.notifier).getById(_importedSessionId!);
+    }
+    final csvFiles = _sessionFiles
+        ?.where((f) => f.path.toLowerCase().endsWith('.csv'))
+        .toList();
+    if (csvFiles == null || csvFiles.isEmpty) return null;
+
+    final adapter = MuseLogAdapter();
+    final session = await adapter.importSession(csvFiles.first);
+    ref.read(sessionsProvider.notifier).addSession(session);
+    setState(() => _importedSessionId = session.id);
+    return session;
+  }
+
+  Future<void> _createManifest() async {
+    setState(() => _healthLogBusy = true);
+    try {
+      final session = await _ensureImported();
+      if (session == null) return;
+
+      final hashSvc = ref.read(hashingServiceProvider);
+      String rawHash = session.rawFileHash ?? '';
+      if (rawHash.isEmpty && session.rawFileUri != null) {
+        rawHash = await hashSvc.hashRawFile(File(session.rawFileUri!));
+      }
+      var updated = session.copyWith(rawFileHash: rawHash);
+      final manifest = hashSvc.createSessionManifest(updated);
+      final manifestHash = hashSvc.hashManifest(manifest);
+      updated = updated.copyWith(manifestHash: manifestHash);
+      ref.read(sessionsProvider.notifier).updateSession(updated);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('HealthLog manifest created.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _healthLogBusy = false);
+    }
+  }
+
+  Future<void> _encryptSession() async {
+    setState(() => _healthLogBusy = true);
+    try {
+      final session = await _ensureImported();
+      if (session == null || session.rawFileUri == null) return;
+
+      final svc = ref.read(encryptionServiceProvider);
+      final result = await svc.encryptFile(File(session.rawFileUri!));
+      ref.read(sessionsProvider.notifier).updateSession(
+            session.copyWith(
+              encryptedFileUri: result.encryptedFile.path,
+              encryptionStatus: SessionEncryptionStatus.encrypted,
+            ),
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session encrypted.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _healthLogBusy = false);
+    }
+  }
+
+  Future<void> _openInHealthLog() async {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HealthLogDashboardScreen()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _generateAISummary() async {
+    setState(() => _healthLogBusy = true);
+    try {
+      final session = await _ensureImported();
+      if (session == null) return;
+
+      if (session.manifestHash == null) {
+        await _createManifest();
+      }
+      final refreshed =
+          ref.read(sessionsProvider.notifier).getById(session.id);
+      if (refreshed == null || refreshed.manifestHash == null) return;
+
+      final aiSvc = ref.read(aiReportServiceProvider);
+      final report = await aiSvc.generateSessionSummary(
+        session: refreshed,
+        manifestHash: refreshed.manifestHash!,
+      );
+      ref.read(aiReportsProvider.notifier).addReport(report);
+      ref.read(sessionsProvider.notifier).updateSession(
+            refreshed.copyWith(aiSummaryStatus: AISummaryStatus.generated),
+          );
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SessionDetailScreen(sessionId: session.id),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _healthLogBusy = false);
+    }
   }
 
   @override
@@ -79,12 +223,26 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
                             _formatDuration(recordingManager.elapsedSeconds),
                           ),
                           _buildSummaryRow(
-                            'Devices',
+                            'Muse Devices',
                             '${config?.selectedDeviceIds.length ?? 0}',
+                          ),
+                          _buildSummaryRow(
+                            'Oura Ring',
+                            (config?.includeOura ?? false) ? 'Yes' : 'No',
+                          ),
+                          _buildSummaryRow(
+                            'Ray-Ban Media',
+                            (config?.includeRayBan ?? false)
+                                ? '${config!.raybanMediaPaths.length} files'
+                                : 'No',
                           ),
                           _buildSummaryRow(
                             'Columns Recorded',
                             '${config?.selectedColumns.length ?? 0}',
+                          ),
+                          _buildSummaryRow(
+                            'Video Recorded',
+                            (config?.recordVideo ?? false) ? 'Yes' : 'No',
                           ),
                           if (config?.notes.isNotEmpty ?? false) ...[
                             const SizedBox(height: 8),
@@ -101,7 +259,7 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
 
                   const SizedBox(height: 16),
 
-                  // CSV files
+                  // Recorded files (CSV + video)
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -131,7 +289,7 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _shareAllFiles,
                         icon: const Icon(Icons.share),
-                        label: const Text('Share All CSV Files'),
+                        label: const Text('Share All Session Files'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
@@ -152,9 +310,78 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // HealthLog Actions
+                  Card(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.health_and_safety,
+                                  size: 20,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary),
+                              const SizedBox(width: 8),
+                              Text('HealthLog Actions',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                          fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const Divider(height: 24),
+                          _healthLogButton(
+                            Icons.arrow_forward,
+                            'Continue to HealthLog',
+                            _openInHealthLog,
+                          ),
+                          _healthLogButton(
+                            Icons.fingerprint,
+                            'Create HealthLog Manifest',
+                            _createManifest,
+                          ),
+                          _healthLogButton(
+                            Icons.lock,
+                            'Encrypt Session',
+                            _encryptSession,
+                          ),
+                          _healthLogButton(
+                            Icons.auto_awesome,
+                            'Generate AI Summary',
+                            _generateAISummary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _healthLogButton(
+      IconData icon, String label, Future<void> Function() onPressed) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: FilledButton.icon(
+        onPressed: _healthLogBusy ? null : () => onPressed(),
+        icon: Icon(icon),
+        label: Text(label),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+        ),
+      ),
     );
   }
 
@@ -177,14 +404,30 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
   Widget _buildFileRow(File file) {
     final fileName = file.uri.pathSegments.last;
     final fileSize = FileStorageHelper.formatFileSize(file.lengthSync());
+    final ext = fileName.split('.').last.toLowerCase();
+    final isVideo = {'mp4', 'mov', 'avi', 'mkv', 'webm'}.contains(ext);
+    final isImage = {'jpg', 'jpeg', 'png', 'heic', 'heif'}.contains(ext);
+
+    IconData icon;
+    String typeLabel;
+    if (isVideo) {
+      icon = Icons.videocam;
+      typeLabel = 'Video';
+    } else if (isImage) {
+      icon = Icons.image;
+      typeLabel = 'Photo';
+    } else {
+      icon = Icons.insert_drive_file;
+      typeLabel = 'CSV';
+    }
 
     return ListTile(
-      leading: const Icon(Icons.insert_drive_file),
+      leading: Icon(icon),
       title: Text(
         fileName,
         style: const TextStyle(fontSize: 12),
       ),
-      subtitle: Text(fileSize),
+      subtitle: Text('$typeLabel · $fileSize'),
       trailing: IconButton(
         icon: const Icon(Icons.share),
         onPressed: () => _shareFile(file),
@@ -202,8 +445,8 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
   Future<void> _shareFile(File file) async {
     await Share.shareXFiles(
       [XFile(file.path)],
-      subject: 'Muse Session Data',
-      text: 'Muse brain-sensing headband recording data (CSV)',
+      subject: 'HealthLog Session Data',
+      text: 'HealthLog session recording data',
     );
   }
 
@@ -212,8 +455,8 @@ class _PostSessionScreenState extends ConsumerState<PostSessionScreen> {
 
     await Share.shareXFiles(
       _sessionFiles!.map((f) => XFile(f.path)).toList(),
-      subject: 'Muse Session Data',
-      text: 'Muse brain-sensing headband recording data (CSV)',
+      subject: 'HealthLog Session Data',
+      text: 'HealthLog session recording data (EEG, Oura, Ray-Ban, video)',
     );
   }
 

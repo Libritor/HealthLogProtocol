@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
+    <!-- Network access for OSC streaming (UDP) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <!-- Permissions for Muse headband Bluetooth connection -->
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
@@ -9,11 +12,24 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+
+    <!-- Media access for Ray-Ban Meta glasses media import -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+
+    <!-- Camera & microphone for synchronized video recording -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
     
     <application
-        android:label="MuseLog"
+        android:label="HealthLog"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

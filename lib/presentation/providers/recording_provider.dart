@@ -5,12 +5,12 @@ import '../../domain/models/session_config.dart';
 import '../../domain/models/band_power_sample.dart';
 import '../../domain/models/fnirs_sample.dart';
 import '../../domain/models/imu_sample.dart';
-import '../../domain/models/arousal_sample.dart';
 import '../../data/storage/csv_writer.dart';
 import '../../data/storage/file_storage_helper.dart';
 import '../../core/constants.dart';
+import '../../data/camera/camera_recording_service.dart';
 import 'device_provider.dart';
-import 'arousal_provider.dart';
+import 'camera_provider.dart';
 
 final sessionConfigProvider =
     StateNotifierProvider<SessionConfigNotifier, SessionConfig?>((ref) {
@@ -25,6 +25,10 @@ class SessionConfigNotifier extends StateNotifier<SessionConfig?> {
     required Set<String> selectedColumns,
     required String sessionName,
     String notes = '',
+    bool recordVideo = false,
+    bool includeOura = false,
+    bool includeRayBan = false,
+    List<String> raybanMediaPaths = const [],
   }) {
     state = SessionConfig(
       selectedDeviceIds: selectedDeviceIds,
@@ -32,6 +36,10 @@ class SessionConfigNotifier extends StateNotifier<SessionConfig?> {
       sessionName: sessionName,
       notes: notes,
       startTime: DateTime.now(),
+      recordVideo: recordVideo,
+      includeOura: includeOura,
+      includeRayBan: includeRayBan,
+      raybanMediaPaths: raybanMediaPaths,
     );
   }
 
@@ -142,14 +150,21 @@ class RecordingManager {
   Timer? _recordingTimer;
   DateTime? _sessionStartTime;
   int _elapsedSeconds = 0;
+  bool _isPaused = false;
+  File? _videoFile;
 
   // Buffer latest data from slower streams to merge with EEG
   final Map<String, BandPowerSample> _latestBandPower = {};
   final Map<String, FnirsSample> _latestFnirs = {};
   final Map<String, ImuSample> _latestImu = {};
-  final Map<String, ArousalSample> _latestArousal = {};
 
   RecordingManager(this.ref);
+
+  File? get videoFile => _videoFile;
+
+  void setVideoFile(File file) {
+    _videoFile = file;
+  }
 
   Future<void> startRecording() async {
     final config = ref.read(sessionConfigProvider);
@@ -159,38 +174,62 @@ class RecordingManager {
 
     _sessionStartTime = DateTime.now();
     _elapsedSeconds = 0;
+    _isPaused = false;
+    _videoFile = null;
 
     _latestBandPower.clear();
     _latestFnirs.clear();
     _latestImu.clear();
-    _latestArousal.clear();
 
-    final csvWritersNotifier = ref.read(csvWritersProvider.notifier);
-    final deviceNamesNotifier = ref.read(deviceNamesProvider.notifier);
-    
-    for (var deviceId in config.selectedDeviceIds) {
-      final deviceName = deviceNamesNotifier.assignName(deviceId);
-      
-      await csvWritersNotifier.createWriter(
-        deviceId,
-        deviceName,
-        config.selectedColumns.toList(),
-        sessionStartTime: _sessionStartTime,
-      );
-    }
+    if (config.hasMuseDevices) {
+      final csvWritersNotifier = ref.read(csvWritersProvider.notifier);
+      final deviceNamesNotifier = ref.read(deviceNamesProvider.notifier);
 
-    for (var deviceId in config.selectedDeviceIds) {
-      _subscribeToDeviceStreams(deviceId);
+      for (var deviceId in config.selectedDeviceIds) {
+        final deviceName = deviceNamesNotifier.assignName(deviceId);
+
+        await csvWritersNotifier.createWriter(
+          deviceId,
+          deviceName,
+          config.selectedColumns.toList(),
+          sessionStartTime: _sessionStartTime,
+        );
+        await Future.delayed(Duration.zero);
+      }
+
+      if (config.recordVideo) {
+        final cameraService = ref.read(cameraRecordingServiceProvider);
+        final cameraDirection = ref.read(selectedCameraDirectionProvider);
+        final videoOrientation = ref.read(selectedVideoOrientationProvider);
+        await cameraService.initialize(
+          direction: cameraDirection,
+          landscape: videoOrientation == VideoOrientation.landscape,
+        );
+        final primaryDeviceId = config.selectedDeviceIds.first;
+        final primaryDeviceName =
+            ref.read(deviceNamesProvider)[primaryDeviceId] ?? 'Unknown';
+        await cameraService.startRecording(
+          deviceId: primaryDeviceId,
+          deviceName: primaryDeviceName,
+          sessionStartTime: _sessionStartTime,
+        );
+      }
+
+      for (var deviceId in config.selectedDeviceIds) {
+        _subscribeToDeviceStreams(deviceId);
+        await Future.delayed(Duration.zero);
+      }
     }
 
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _elapsedSeconds++;
+      if (!_isPaused) {
+        _elapsedSeconds++;
+      }
     });
 
     ref.read(recordingStateProvider.notifier).startRecording();
   }
 
-  // EEG drives CSV writes, other streams just buffer their latest values.
   void _subscribeToDeviceStreams(String deviceId) {
     final csvWriters = ref.read(csvWritersProvider);
     final writer = csvWriters[deviceId];
@@ -201,10 +240,11 @@ class RecordingManager {
     if (device == null) return;
 
     final deviceName = ref.read(deviceNamesProvider)[deviceId] ?? 'Unknown';
+    final museService = ref.read(museServiceProvider);
 
-    // EEG at 256 Hz - main driver
-    final eegSub = ref.read(eegStreamProvider(deviceId).stream).listen(
+    final eegSub = museService.subscribeToEeg(deviceId).listen(
       (eegSample) {
+        if (_isPaused) return;
         writer.writeRow(
           packetType: 'EEG',
           deviceName: deviceName,
@@ -214,16 +254,13 @@ class RecordingManager {
           bandPowerSample: _latestBandPower[deviceId],
           fnirsSample: _latestFnirs[deviceId],
           imuSample: _latestImu[deviceId],
-          arousalSample: _latestArousal[deviceId],
         );
       },
       onError: (error) => print('EEG stream error for $deviceId: $error'),
     );
     _subscriptions['${deviceId}_eeg'] = eegSub;
 
-    // Band powers at ~10 Hz
-    final bandPowerSub =
-        ref.read(bandPowerStreamProvider(deviceId).stream).listen(
+    final bandPowerSub = museService.subscribeToBandPowers(deviceId).listen(
       (bandPowerSample) {
         _latestBandPower[deviceId] = bandPowerSample;
       },
@@ -232,33 +269,21 @@ class RecordingManager {
     );
     _subscriptions['${deviceId}_bandpower'] = bandPowerSub;
 
-    // fNIRS at ~64 Hz
-    final fnirsSub = ref.read(fnirsStreamProvider(deviceId).stream).listen(
+    final fnirsSub = museService.subscribeToFnirs(deviceId).listen(
       (fnirsSample) {
-        print('fNIRS data received for $deviceId: 730nm_LO=${fnirsSample.nm730LeftOuter}, 850nm_LO=${fnirsSample.nm850LeftOuter}');
         _latestFnirs[deviceId] = fnirsSample;
       },
       onError: (error) => print('fNIRS stream error for $deviceId: $error'),
     );
     _subscriptions['${deviceId}_fnirs'] = fnirsSub;
 
-    // IMU at ~52 Hz
-    final imuSub = ref.read(imuStreamProvider(deviceId).stream).listen(
+    final imuSub = museService.subscribeToImu(deviceId).listen(
       (imuSample) {
         _latestImu[deviceId] = imuSample;
       },
       onError: (error) => print('IMU stream error for $deviceId: $error'),
     );
     _subscriptions['${deviceId}_imu'] = imuSub;
-
-    // Arousal Index at ~0.5 Hz (updates every 2 seconds)
-    final arousalSub = ref.read(arousalStreamProvider(deviceId).stream).listen(
-      (arousalSample) {
-        _latestArousal[deviceId] = arousalSample;
-      },
-      onError: (error) => print('Arousal stream error for $deviceId: $error'),
-    );
-    _subscriptions['${deviceId}_arousal'] = arousalSub;
   }
 
   Future<void> stopRecording() async {
@@ -272,7 +297,42 @@ class RecordingManager {
 
     await ref.read(csvWritersProvider.notifier).closeAll();
 
+    final config = ref.read(sessionConfigProvider);
+    if (config != null && config.recordVideo) {
+      final cameraService = ref.read(cameraRecordingServiceProvider);
+      if (cameraService.isRecording) {
+        final saved = await cameraService.stopRecording();
+        if (saved != null) _videoFile = saved;
+      }
+    }
+
     ref.read(recordingStateProvider.notifier).stopRecording();
+  }
+
+  Future<void> pauseRecording() async {
+    if (_isPaused) return;
+    _isPaused = true;
+
+    final config = ref.read(sessionConfigProvider);
+    if (config != null && config.recordVideo) {
+      final cameraService = ref.read(cameraRecordingServiceProvider);
+      await cameraService.pauseRecording();
+    }
+
+    ref.read(recordingStateProvider.notifier).pauseRecording();
+  }
+
+  Future<void> resumeRecording() async {
+    if (!_isPaused) return;
+
+    final config = ref.read(sessionConfigProvider);
+    if (config != null && config.recordVideo) {
+      final cameraService = ref.read(cameraRecordingServiceProvider);
+      await cameraService.resumeRecording();
+    }
+
+    _isPaused = false;
+    ref.read(recordingStateProvider.notifier).resumeRecording();
   }
 
   void addTrigger() {

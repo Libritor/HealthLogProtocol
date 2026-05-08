@@ -1,38 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'presentation/screens/device_selection_screen.dart';
+import 'core/app_colors.dart';
+import 'presentation/screens/healthlog_dashboard_screen.dart';
 
 void main() {
   runApp(
     const ProviderScope(
-      child: MuseHeadbandApp(),
+      child: HealthLogProtocolApp(),
     ),
   );
 }
 
-class MuseHeadbandApp extends StatelessWidget {
-  const MuseHeadbandApp({super.key});
+class HealthLogProtocolApp extends StatelessWidget {
+  const HealthLogProtocolApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.buildTheme();
     return MaterialApp(
-      title: 'Muse Headband Recorder',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      themeMode: ThemeMode.system,
-      home: const DeviceSelectionScreen(),
+      title: 'HealthLog Protocol',
+      theme: theme,
+      darkTheme: theme,
+      themeMode: ThemeMode.dark,
+      home: const HealthLogDashboardScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

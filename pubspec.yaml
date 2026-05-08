@@ -1,5 +1,5 @@
-name: muselog
-description: Flutter app for Muse S/Athena brain-sensing headbands - real-time EEG visualization and CSV recording.
+name: healthlog
+description: Health logging app with Muse headband EEG and Oura Ring biometric data collection.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -40,15 +40,38 @@ dependencies:
   
   # File Picker
   file_picker: ^8.0.0
+
+  # Video Thumbnails
+  video_thumbnail: ^0.5.3
   
   # HTTP Client
   http: ^1.1.0
+
+  # Persistent key-value storage (Oura token, preferences)
+  shared_preferences: ^2.2.2
   
   # Text-to-Speech for AI voice feedback
   flutter_tts: ^3.8.5
   
   # UUID for unique session IDs
   uuid: ^4.2.1
+
+  # Camera for synchronized video recording
+  camera: ^0.11.0+2
+
+  # Cryptography (hashing, encryption)
+  crypto: ^3.0.3
+  pointycastle: ^3.7.3
+  encrypt: ^5.0.3
+
+  # Secure storage (encryption keys only -- never use shared_preferences for keys)
+  flutter_secure_storage: ^9.0.0
+
+  # URL launcher (Solana Explorer links)
+  url_launcher: ^6.2.0
+
+  # Solana RPC client (devnet memo transactions)
+  solana: ^0.31.0
 
 dev_dependencies:
   flutter_test:

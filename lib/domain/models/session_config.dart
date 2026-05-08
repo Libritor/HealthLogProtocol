@@ -4,6 +4,10 @@ class SessionConfig {
   final String sessionName;
   final String notes;
   final DateTime startTime;
+  final bool recordVideo;
+  final bool includeOura;
+  final bool includeRayBan;
+  final List<String> raybanMediaPaths;
 
   const SessionConfig({
     required this.selectedDeviceIds,
@@ -11,7 +15,13 @@ class SessionConfig {
     required this.sessionName,
     this.notes = '',
     required this.startTime,
+    this.recordVideo = false,
+    this.includeOura = false,
+    this.includeRayBan = false,
+    this.raybanMediaPaths = const [],
   });
+
+  bool get hasMuseDevices => selectedDeviceIds.isNotEmpty;
 
   SessionConfig copyWith({
     List<String>? selectedDeviceIds,
@@ -19,6 +29,10 @@ class SessionConfig {
     String? sessionName,
     String? notes,
     DateTime? startTime,
+    bool? recordVideo,
+    bool? includeOura,
+    bool? includeRayBan,
+    List<String>? raybanMediaPaths,
   }) {
     return SessionConfig(
       selectedDeviceIds: selectedDeviceIds ?? this.selectedDeviceIds,
@@ -26,6 +40,10 @@ class SessionConfig {
       sessionName: sessionName ?? this.sessionName,
       notes: notes ?? this.notes,
       startTime: startTime ?? this.startTime,
+      recordVideo: recordVideo ?? this.recordVideo,
+      includeOura: includeOura ?? this.includeOura,
+      includeRayBan: includeRayBan ?? this.includeRayBan,
+      raybanMediaPaths: raybanMediaPaths ?? this.raybanMediaPaths,
     );
   }
 }

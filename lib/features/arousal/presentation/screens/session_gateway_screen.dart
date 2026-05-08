@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../presentation/screens/recording_config_screen.dart';
 import '../../../../presentation/providers/device_provider.dart';
+import '../../../../presentation/providers/oura_provider.dart';
 import '../../../../data/ai/meditation_ai_service.dart';
 import 'arousal_live_session_screen.dart';
 
@@ -12,6 +13,12 @@ class SessionGatewayScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedDevices = ref.watch(selectedDevicesProvider);
+    final connectedDevices = ref.watch(connectedDevicesProvider);
+    final ouraAuth = ref.watch(ouraAuthStateProvider);
+    final hasMuseDevices = selectedDevices.isNotEmpty;
+    final hasOura = ouraAuth.status == OuraConnectionStatus.connected;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session Mode'),
@@ -32,13 +39,11 @@ class SessionGatewayScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 48),
               
-              // Data Collection Button
               SizedBox(
                 width: double.infinity,
                 height: 120,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Navigate to original MuseLog recording flow
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -63,20 +68,21 @@ class SessionGatewayScreen extends ConsumerWidget {
               
               const SizedBox(height: 24),
               
-              // Arousal Index & AI Mentor Button
               SizedBox(
                 width: double.infinity,
                 height: 120,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Navigate to goal selection
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MeditationGoalScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: hasMuseDevices
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const MeditationGoalScreen(),
+                            ),
+                          );
+                        }
+                      : null,
                   icon: const Icon(Icons.psychology, size: 48),
                   label: const Text(
                     'Arousal Index & AI Mentor',
@@ -86,6 +92,8 @@ class SessionGatewayScreen extends ConsumerWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.purple.withOpacity(0.3),
+                    disabledForegroundColor: Colors.white54,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -95,11 +103,13 @@ class SessionGatewayScreen extends ConsumerWidget {
               
               const SizedBox(height: 48),
               
-              const Text(
-                'Data Collection: Standard CSV recording and visualization\n\n'
-                'Arousal Index & AI Mentor: AI-guided meditation with real-time brain state feedback',
+              Text(
+                'Data Collection: Standard CSV recording and visualization'
+                '${hasOura ? " (includes Oura Ring data)" : ""}\n\n'
+                'Arousal Index & AI Mentor: AI-guided meditation with real-time brain state feedback'
+                '${!hasMuseDevices ? "\n(Requires a connected Muse headband)" : ""}',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: Colors.grey,
                 ),

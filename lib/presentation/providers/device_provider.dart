@@ -118,6 +118,11 @@ class DeviceNamesNotifier extends StateNotifier<Map<String, String>> {
     return state[deviceId]!;
   }
 
+  void rename(String deviceId, String newName) {
+    if (newName.trim().isEmpty) return;
+    state = {...state, deviceId: newName.trim()};
+  }
+
   void removeName(String deviceId) {
     final newState = Map<String, String>.from(state);
     newState.remove(deviceId);

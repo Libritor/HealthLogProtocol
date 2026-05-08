@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/muse/osc_service.dart';
 import '../../domain/models/band_power_sample.dart';
 import 'device_provider.dart';
+import 'recording_provider.dart';
 
 /// Provider for the OSC Streaming Manager
 final oscStreamingManagerProvider = Provider<OscStreamingManager>((ref) {
@@ -11,7 +12,14 @@ final oscStreamingManagerProvider = Provider<OscStreamingManager>((ref) {
 
 class OscStreamingManager {
   final Ref ref;
-  final Map<String, StreamSubscription> _subscriptions = {};
+  final Map<String, StreamSubscription<dynamic>> _subscriptions = {};
+
+  int _resolveTargetPort(int deviceIndex) {
+    final targetPorts = ref.read(oscTargetPortsProvider);
+    if (targetPorts.isEmpty) return 5000;
+    if (targetPorts.length == 1) return targetPorts.first;
+    return targetPorts[deviceIndex % targetPorts.length];
+  }
 
   OscStreamingManager(this.ref) {
     // Listen to streaming toggle
@@ -25,8 +33,10 @@ class OscStreamingManager {
   }
 
   void _startStreaming() {
-    final connectedDevices = ref.read(connectedDevicesProvider);
-    final deviceIds = connectedDevices.keys.toList();
+    // Prefer the session's selected device order (stable Person mapping).
+    final config = ref.read(sessionConfigProvider);
+    final deviceIds = config?.selectedDeviceIds ??
+        ref.read(connectedDevicesProvider).keys.toList();
     
     // Subscribe to all connected devices with person mapping
     for (int i = 0; i < deviceIds.length; i++) {
@@ -46,7 +56,10 @@ class OscStreamingManager {
   /// [deviceId] - The device identifier
   /// [deviceIndex] - The device index (0 = Person 1, 1 = Person 2, etc.)
   void _subscribeToDevice(String deviceId, int deviceIndex) {
-    if (_subscriptions.containsKey(deviceId)) return;
+    final bandPowerKey = '$deviceId:bandPower';
+    final hsiKey = '$deviceId:hsi';
+    final eegKey = '$deviceId:eeg';
+    if (_subscriptions.containsKey(bandPowerKey)) return;
 
     final oscService = ref.read(oscServiceProvider);
     
@@ -57,60 +70,102 @@ class OscStreamingManager {
     // Change this in the UI (OSC Settings dialog) or modify the default in osc_service.dart
     // ============================================================================
     
-    // Subscribe to Band Powers
-    final sub = ref.read(bandPowerStreamProvider(deviceId).stream).listen((sample) {
+    // Subscribe directly to the MuseService broadcast stream
+    // (Riverpod's StreamProvider.stream is unreliable from a Provider context)
+    final museService = ref.read(museServiceProvider);
+    final bandPowerSub = museService.subscribeToBandPowers(deviceId).listen((sample) {
       // ============================================================================
       // 🎯 READING TARGET IP FROM PROVIDER
       // ============================================================================
       // This is where your PC/VR IP address is retrieved
       final targetIp = ref.read(oscTargetIpProvider);
+      if (targetIp.trim().isEmpty) return;
       
-      // Determine which person this device represents
-      // Person 1 (index 0) → Port 5000, OSC address /person1/eeg
-      // Person 2 (index 1) → Port 5001, OSC address /person2/eeg
-      final int targetPort;
-      final String oscAddress;
-      
-      if (deviceIndex == 0) {
-        // First device = Person 1
-        targetPort = 5000;
-        oscAddress = '/person1/eeg';
-      } else if (deviceIndex == 1) {
-        // Second device = Person 2
-        targetPort = 5001;
-        oscAddress = '/person2/eeg';
-      } else {
-        // Additional devices (if any) - fallback to multi-port from provider
-        final targetPorts = ref.read(oscTargetPortsProvider);
-        targetPort = targetPorts.isNotEmpty ? targetPorts[deviceIndex % targetPorts.length] : 5000;
-        oscAddress = '/person${deviceIndex + 1}/eeg';
-      }
+      final int targetPort = _resolveTargetPort(deviceIndex);
 
-      // ============================================================================
-      // 🎯 EXTRACTING AND AVERAGING BAND POWER VALUES
-      // ============================================================================
-      // This is where the band power values from your Muse headband are processed
-      // We average across all 4 EEG channels (TP9, AF7, AF8, TP10)
-      final bandPowers = _calculateAveragedBandPowers(sample);
-      // bandPowers = [deltaAvg, thetaAvg, alphaAvg, betaAvg]
-      
-      // ============================================================================
-      // 🎯 SENDING OSC MESSAGE
-      // ============================================================================
-      // Format: [delta, theta, alpha, beta] sent to targetIp:targetPort
-      // with OSC address /person1/eeg or /person2/eeg
-      oscService.send(
-        oscAddress,
-        bandPowers,
-        targetIp,
-        targetPort,
-      );
+      final format = ref.read(oscOutputFormatProvider);
+      switch (format) {
+        case OscOutputFormat.muselog:
+          final oscAddress = '/person${deviceIndex + 1}/eeg';
+
+          // MuseLog legacy format: average across all 4 EEG channels.
+          final bandPowers = _calculateAveragedBandPowers(sample);
+          oscService.send(
+            oscAddress,
+            bandPowers,
+            targetIp,
+            targetPort,
+          );
+          break;
+        case OscOutputFormat.snowballArcade:
+          _sendSnowballArcadeBandPowersAbsolute(
+            oscService: oscService,
+            sample: sample,
+            targetIp: targetIp,
+            targetPort: targetPort,
+          );
+          break;
+      }
 
     }, onError: (e) {
       print('Error streaming OSC for $deviceId: $e');
     });
 
-    _subscriptions[deviceId] = sub;
+    _subscriptions[bandPowerKey] = bandPowerSub;
+
+    // Mind Monitor receivers often use horseshoe to decide if values are usable.
+    final hsiSub = museService.subscribeToHsi(deviceId).listen((hsiMap) {
+      final targetIp = ref.read(oscTargetIpProvider);
+      if (targetIp.trim().isEmpty) return;
+
+      final int targetPort = _resolveTargetPort(deviceIndex);
+
+      final format = ref.read(oscOutputFormatProvider);
+      if (format != OscOutputFormat.snowballArcade) return;
+
+      // Mind Monitor: `/muse/elements/horseshoe` with 4 ints [TP9, AF7, AF8, TP10]
+      oscService.send(
+        '/muse/elements/horseshoe',
+        [
+          (hsiMap['TP9']?.value ?? 4),
+          (hsiMap['AF7']?.value ?? 4),
+          (hsiMap['AF8']?.value ?? 4),
+          (hsiMap['TP10']?.value ?? 4),
+        ],
+        targetIp,
+        targetPort,
+      );
+    }, onError: (e) {
+      print('Error streaming OSC HSI for $deviceId: $e');
+    });
+    _subscriptions[hsiKey] = hsiSub;
+
+    // Raw EEG stream: SnowballArcade can fall back to computing band powers from `/muse/eeg`.
+    // Mind Monitor uses `/muse/eeg` with floats [TP9, AF7, AF8, TP10].
+    var eegDecimate = 0;
+    final eegSub = museService.subscribeToEeg(deviceId).listen((eeg) {
+      final targetIp = ref.read(oscTargetIpProvider);
+      if (targetIp.trim().isEmpty) return;
+
+      final format = ref.read(oscOutputFormatProvider);
+      if (format != OscOutputFormat.snowballArcade) return;
+
+      // Raw EEG is ~256Hz. To reduce UDP/CPU load, send every 4th sample (~64Hz).
+      eegDecimate = (eegDecimate + 1) % 4;
+      if (eegDecimate != 0) return;
+
+      final int targetPort = _resolveTargetPort(deviceIndex);
+
+      oscService.send(
+        '/muse/eeg',
+        [eeg.tp9, eeg.af7, eeg.af8, eeg.tp10],
+        targetIp,
+        targetPort,
+      );
+    }, onError: (e) {
+      print('Error streaming OSC EEG for $deviceId: $e');
+    });
+    _subscriptions[eegKey] = eegSub;
   }
   
   /// Calculate averaged band powers across all 4 EEG channels
@@ -151,6 +206,71 @@ class OscStreamingManager {
     
     // Return in the order expected by Unity/VR: [delta, theta, alpha, beta]
     return [deltaAvg, thetaAvg, alphaAvg, betaAvg];
+  }
+
+  void _sendSnowballArcadeBandPowersAbsolute({
+    required OscService oscService,
+    required BandPowerSample sample,
+    required String targetIp,
+    required int targetPort,
+  }) {
+    // SnowballArcade listens for these OSC addresses and averages multiple args.
+    // Send 4 values per message: [TP9, AF7, AF8, TP10]
+    oscService.send(
+      '/muse/elements/delta_absolute',
+      [
+        sample.tp9.deltaAbsolute,
+        sample.af7.deltaAbsolute,
+        sample.af8.deltaAbsolute,
+        sample.tp10.deltaAbsolute,
+      ],
+      targetIp,
+      targetPort,
+    );
+    oscService.send(
+      '/muse/elements/theta_absolute',
+      [
+        sample.tp9.thetaAbsolute,
+        sample.af7.thetaAbsolute,
+        sample.af8.thetaAbsolute,
+        sample.tp10.thetaAbsolute,
+      ],
+      targetIp,
+      targetPort,
+    );
+    oscService.send(
+      '/muse/elements/alpha_absolute',
+      [
+        sample.tp9.alphaAbsolute,
+        sample.af7.alphaAbsolute,
+        sample.af8.alphaAbsolute,
+        sample.tp10.alphaAbsolute,
+      ],
+      targetIp,
+      targetPort,
+    );
+    oscService.send(
+      '/muse/elements/beta_absolute',
+      [
+        sample.tp9.betaAbsolute,
+        sample.af7.betaAbsolute,
+        sample.af8.betaAbsolute,
+        sample.tp10.betaAbsolute,
+      ],
+      targetIp,
+      targetPort,
+    );
+    oscService.send(
+      '/muse/elements/gamma_absolute',
+      [
+        sample.tp9.gammaAbsolute,
+        sample.af7.gammaAbsolute,
+        sample.af8.gammaAbsolute,
+        sample.tp10.gammaAbsolute,
+      ],
+      targetIp,
+      targetPort,
+    );
   }
   
   /// Refresh subscriptions (call when new device connects)

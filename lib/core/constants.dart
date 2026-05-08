@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // 82 columns matching the Muse data spec
+  // Columns for standard MuseLog data collection CSV export.
   static const List<String> csvColumns = [
     'PACKET_TYPE',
     'DEVICE_NAME',
@@ -101,10 +101,6 @@ class AppConstants {
     'AMBIENT_RIGHT_INNER',
     // Battery
     'BATTERY_PERCENT',
-    // Arousal Index
-    'AROUSAL_INDEX',
-    'AROUSAL_LABEL',
-    'AROUSAL_CONFIDENCE',
   ];
 
   // Column groups for UI selection
@@ -204,11 +200,6 @@ class AppConstants {
       'AMBIENT_RIGHT_INNER',
     ],
     'Battery': ['BATTERY_PERCENT'],
-    'Arousal Index': [
-      'AROUSAL_INDEX',
-      'AROUSAL_LABEL',
-      'AROUSAL_CONFIDENCE',
-    ],
   };
 
   // HSI (Horseshoe Signal Indicator) values and color mapping

@@ -1074,12 +1074,8 @@ class _ArousalLiveSessionScreenState
               const SizedBox(height: 16),
               SizedBox(
                 height: 200,
-                child: ref.watch(eegStreamProvider(widget.deviceId)).when(
-                  data: (eegSample) => EegChart(
-                    dataStream: ref.read(eegStreamProvider(widget.deviceId).stream),
-                  ),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Center(child: Text('EEG Error: $e')),
+                child: EegChart(
+                  dataStream: ref.read(museServiceProvider).subscribeToEeg(widget.deviceId),
                 ),
               ),
             ],
@@ -1131,12 +1127,8 @@ class _ArousalLiveSessionScreenState
               const SizedBox(height: 16),
               SizedBox(
                 height: 200,
-                child: ref.watch(bandPowerStreamProvider(widget.deviceId)).when(
-                  data: (sample) => BandPowerChart(
-                    dataStream: ref.read(bandPowerStreamProvider(widget.deviceId).stream),
-                  ),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Center(child: Text('Band Power Error: $e')),
+                child: BandPowerChart(
+                  dataStream: ref.read(museServiceProvider).subscribeToBandPowers(widget.deviceId),
                 ),
               ),
             ],

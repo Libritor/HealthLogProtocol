@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>MuseLog</string>
+	<string>HealthLog</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>MuseLog</string>
+	<string>HealthLog</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -49,5 +49,11 @@
 	<string>This app needs Bluetooth to connect to your Muse headband and receive brainwave data.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app needs Bluetooth to connect to your Muse headband and receive brainwave data.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>HealthLog streams OSC data to devices on your local network (e.g., a computer running an OSC receiver).</string>
+	<key>NSCameraUsageDescription</key>
+	<string>HealthLog records video from your camera to synchronize with EEG brainwave data.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>HealthLog records audio alongside video during EEG sessions for synchronized playback.</string>
 </dict>
 </plist>
