@@ -1,6 +1,6 @@
-# HealthLog Protocol — 2.5-min Pitch Deck
+# HealthLog Protocol — Pitch Deck
 
-10 slides, ~15s each. Designed for a live competition where the audience is reading on a screen behind you while you talk.
+13 slides, ~14s each (≈3:00 total spoken time, which is the Colosseum cap). Designed for a live competition where the audience is reading on a screen behind you while you talk. The added market / business / proof / advisor slides (9–12) are what convert a "cool demo" into a fundable company.
 
 **Color system for every slide:** background `#0E0E11`, text `#F5F5F7`, accent gradient `#9945FF → #14F195` (Solana). Use Inter or Space Grotesk. Single brand mark in the bottom-right corner of every slide except 1 and 10.
 
@@ -137,23 +137,80 @@ QR-code each link in the deck so a judge can scan straight from the slide.
 
 ---
 
-## Slide 9 — Team and traction (15s)
+## Slide 9 — Market: TAM / SAM / SOM (15s)
 
-**Headline:** Built by the people who ship MuseLog.
+**Headline:** A $200B market. A $25B wedge. We're underwriting both.
 
-**Body:** [Founder name] — built MuseLog (used by N researchers / N CSV exports). [Cofounder names + roles]. Building HealthLog Protocol full-time.
+**Visual:** Three concentric circles on the left (TAM outer = teal stroke, SAM middle = purple stroke, SOM inner = solid gradient). Numbers blown up huge on the right.
 
-**Visual:** Two or three faces with names + one-line credentials. If you don't have cofounders yet, single founder + a "Hiring: technical cofounder" call-out is honest and fine.
+| Layer | Size | What it is |
+| --- | --- | --- |
+| **TAM** | **$200B by 2030** | Global wearable-tech hardware ($186B by 2030, Grand View Research) + healthcare-AI software ($188B by 2030, Precedence Research). HealthLog sits at the intersection: the consent + audit layer every wearable AI needs. |
+| **SAM** | **$25B** | ~250M premium wearable users worldwide (Apple Watch, Oura, Whoop, Garmin, Muse) × AI-insight subscriptions, **plus** the rapidly forming B2B market for legally-licensed wearable-derived health datasets used in research, biotech, longevity, and insurance underwriting. |
+| **SOM** | **$80M ARR by 2031** | Capture **0.3%** of SAM via the MuseLog wedge (existing users, EEG-export pain), then 3 more wearable adapters: 500K paying consumers ($30M ARR) + 25 enterprise data-licensing deals ($50M ARR). |
 
-**Why this slide matters:** Per Colosseum's own playbook, judges weight founder-market fit heavily. Your MuseLog credibility *is* the founder-market story.
+**Footer line:** "Sources: Grand View Research (wearable tech, 2030); Precedence Research (healthcare AI, 2030); IDC wearable shipment data."
 
 ---
 
-## Slide 10 — Close + ask (10s)
+## Slide 10 — Business model (15s)
+
+**Headline:** Two revenue engines today. Hardware tomorrow.
+
+**Visual:** Three vertical columns under one shared brand bar at top.
+
+**Column 1 — B2C Subscription**
+$8/month for AI-powered personal health insights drawn from the user's *own* wearable data. The consent + audit + verifier layer is **free forever** — that's the moat.
+
+**Column 2 — B2B Consented Data Marketplace**
+Research labs, biotech, longevity clinics, and insurers pay HealthLog for *aggregated, scope-limited, fully-consented* wearable-derived datasets. Every record is opt-in via a Solana Data Access Token. Users earn revenue-share or HEALTH token rewards. We **never** resell raw data — only consented, scope-bound access. This is the engine that turns 50M users into a $50M+ ARR business without selling people out.
+
+**Column 3 — B2C Hardware (post-Series A)**
+Next-generation brain-sensing wearable, built on the protocol with our advisor's IP lineage (see slide 12). Hardware margin + protocol lock-in.
+
+**Footer line:** "Every dollar flows through on-chain consent. The user is the customer — never the product."
+
+---
+
+## Slide 11 — Why now (15s)
+
+**Headline:** Consumers are done being the product.
+
+**Body (4 stat cards in 2×2 grid, giant numbers, small source text):**
+- **$17M+** in FTC fines against Flo, GoodRx, and BetterHelp in 2023 alone for sharing health data without consent.
+- **7M genetic profiles** leaked from 23andMe in late 2023; stock down ~95% since IPO. The market punished the breach in real time.
+- **81%** of Americans say the risks of corporate data collection outweigh the benefits *(Pew Research, 2023)*.
+- **~500M wearables** shipped per year and growing *(IDC)* — every device a future HealthLog source.
+
+**Closing line:** "The market is asking for HealthLog. We're shipping it on Solana, today, on devnet."
+
+---
+
+## Slide 12 — Team & advisor (15s)
+
+**Headline:** Built by neuro-hackers. Mentored by the Father of Wearable Computing.
+
+**Body (two-up portrait layout):**
+
+**Left — Founder: [Your name]**
+Built MuseLog (N researchers, N CSV exports). Shipping HealthLog Protocol full-time. Domain credibility on the exact wedge.
+
+**Right — Advisor: Prof. Steve Mann**
+Father of Wearable Computing (MIT Media Lab; Professor, ECE, University of Toronto). Co-founder of InteraXon — the company that built the **Muse** brain-sensing headband. Inventor of the EyeTap, HDR imaging, and the field of "humanistic intelligence." 40+ years pioneering body-worn computing.
+
+*If/when you add a cofounder or hire, a third smaller portrait fits below.*
+
+**Visual:** Two large square portraits, gradient frame around each. Logo strip below: MuseLog · MIT Media Lab · University of Toronto · InteraXon (Muse).
+
+**Closing line:** "Nobody else has the credibility *and* the wedge to build this layer."
+
+---
+
+## Slide 13 — Close + ask (10s)
 
 **Headline:** HealthLog Protocol
 
-**Body:** Your wearable data. Your consent. On Solana.
+**Body:** Your wearable data. Your consent. On Solana. The user is the customer.
 
 **Visual:** Same as cover but with a row of links at the bottom (small text, all on one line):
 `github.com/Libritor/HealthLog · Loom: <demo-url> · explorer.solana.com/tx/3b8JsC6BUdsWrAYyV2SfexK4NaUEnvJh9b81to52rHD7KgwCBvfhv6TuoyABd6xKdyVzQ5MgeGpKJQ8tYt5DdKBS?cluster=devnet`
@@ -188,17 +245,26 @@ Below: "Frontier Hackathon · Submission #_____"
 > [Slide 8 — Market, 1:50–2:10]
 > We're starting with MuseLog because I built it — researchers and neuro-hackers already use it, and they have nowhere good to put their EEG. From there, every wearable becomes a HealthLog-attached source. One protocol. N adapters. The TAM is the entire wearable health market — sixty billion dollars and growing every quarter.
 
-> [Slide 9 — Team, 2:10–2:25]
-> I'm [Name]. I shipped MuseLog. [Cofounder] is [role]. We're building HealthLog Protocol full-time on Solana.
+> [Slide 9 — Market TAM/SAM/SOM, 2:10–2:25]
+> The market we're underwriting is two hundred billion dollars by 2030 — wearable hardware plus healthcare AI. Twenty-five billion is serviceable: every premium wearable user plus the B2B market for *legally consented* health data. We're going after eighty million ARR in five years through MuseLog plus three more wearable adapters.
 
-> [Slide 10 — Close, 2:25–2:30]
-> HealthLog Protocol. Your wearable data. Your consent. On Solana. Thanks.
+> [Slide 10 — Business model, 2:25–2:40]
+> Two engines, today. B2C: eight dollars a month for AI insights from your *own* data; the consent layer is free forever. B2B: research labs, biotech, and longevity clinics pay us for aggregated, scope-limited, fully consented wearable data. Users opt in per-token and earn revenue share. We never resell raw data. Hardware comes after Series A.
+
+> [Slide 11 — Why now, 2:40–2:55]
+> The market is asking for this. Seventeen million in FTC fines against Flo, GoodRx, and BetterHelp last year. Seven million genetic profiles leaked from 23andMe. Eighty-one percent of Americans say corporate data collection isn't worth it. Five hundred million wearables ship every year. Every one is a future HealthLog source.
+
+> [Slide 12 — Team & advisor, 2:55–3:10]
+> I'm [Name]. I shipped MuseLog — that's why I'm credible on this wedge. We're advised by Professor Steve Mann — the Father of Wearable Computing, co-founder of InteraXon, the company that built the Muse headband. Forty years of body-worn computing IP behind us.
+
+> [Slide 13 — Close, 3:10–3:15]
+> HealthLog Protocol. Your wearable data. Your consent. On Solana. The user is the customer. Thanks.
 
 ---
 
 ## Slide build order if you're rushed
 
-If you only have an hour to build the deck, prioritize: **6 → 4 → 5 → 1 → 10 → 3 → 2 → 7 → 8 → 9.** Slide 6 (proof) and 4 (architecture) are the most-discussed slides in any judges' Q&A — make them rock-solid first.
+If you only have an hour to build the deck, prioritize: **6 → 4 → 5 → 9 → 10 → 1 → 13 → 12 → 11 → 3 → 2 → 7 → 8.** Slide 6 (proof), 4 (architecture), 9 (market), and 10 (business model) are the slides that judges ask hardest about — make them rock-solid first.
 
 ## Tools
 
