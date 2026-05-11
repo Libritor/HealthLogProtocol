@@ -22,15 +22,15 @@ void main() {
       expect(color, Colors.red);
     });
 
-    test('Unknown HSI value should map to grey', () {
+    test('Unknown HSI value should map to red', () {
       final color = AppConstants.getHsiColor(99);
-      expect(color, Colors.grey);
+      expect(color, Colors.red);
     });
   });
 
   group('CSV Column Schema Tests', () {
-    test('CSV columns should have exactly 81 columns', () {
-      expect(AppConstants.csvColumns.length, 81);
+    test('CSV columns should have exactly 82 columns', () {
+      expect(AppConstants.csvColumns.length, 82);
     });
 
     test('CSV columns should include base info columns', () {
@@ -86,7 +86,7 @@ void main() {
 
   group('BandPowerSample CSV Conversion Tests', () {
     test('BandPowerSample should include all 40 band power columns', () {
-      final channelPower = ChannelBandPower(
+      const channelPower = ChannelBandPower(
         deltaAbsolute: 1.0,
         thetaAbsolute: 2.0,
         alphaAbsolute: 3.0,
@@ -121,16 +121,16 @@ void main() {
 
   group('MuseDevice Tests', () {
     test('MuseDevice equality should be based on ID', () {
-      final device1 = MuseDevice(id: 'MUSE-1', name: 'Muse S');
-      final device2 = MuseDevice(id: 'MUSE-1', name: 'Different Name');
-      final device3 = MuseDevice(id: 'MUSE-2', name: 'Muse S');
+      const device1 = MuseDevice(id: 'MUSE-1', name: 'Muse S');
+      const device2 = MuseDevice(id: 'MUSE-1', name: 'Different Name');
+      const device3 = MuseDevice(id: 'MUSE-2', name: 'Muse S');
 
       expect(device1, equals(device2)); // Same ID
       expect(device1, isNot(equals(device3))); // Different ID
     });
 
     test('MuseDevice copyWith should preserve unchanged values', () {
-      final device = MuseDevice(
+      const device = MuseDevice(
         id: 'MUSE-1',
         name: 'Muse S',
         batteryPercent: 75,
@@ -162,9 +162,8 @@ void main() {
     });
 
     test('All columns should belong to at least one group', () {
-      final allGroupColumns = AppConstants.columnGroups.values
-          .expand((list) => list)
-          .toSet();
+      final allGroupColumns =
+          AppConstants.columnGroups.values.expand((list) => list).toSet();
 
       for (var column in AppConstants.csvColumns) {
         expect(

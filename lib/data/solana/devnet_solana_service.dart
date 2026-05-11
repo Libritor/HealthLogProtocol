@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:solana/solana.dart';
 import 'package:uuid/uuid.dart';
@@ -76,7 +77,7 @@ class DevnetSolanaService implements SolanaConsentService {
     _walletAddress = _keypair!.address;
 
     _funded = await _secureStorage.read(key: _walletFundedKey) == 'true';
-    print('[HealthLog.Solana] Connected wallet: $_walletAddress '
+    debugPrint('[HealthLog.Solana] Connected wallet: $_walletAddress '
         '(cached funded=$_funded)');
 
     // Kick off funding eagerly so commits don't pay the airdrop latency.
@@ -94,7 +95,7 @@ class DevnetSolanaService implements SolanaConsentService {
       final balance = await client.rpcClient.getBalance(_walletAddress!);
       return balance.value;
     } catch (e) {
-      print('[HealthLog.Solana] getBalance failed: $e');
+      debugPrint('[HealthLog.Solana] getBalance failed: $e');
       return 0;
     }
   }
@@ -108,7 +109,7 @@ class DevnetSolanaService implements SolanaConsentService {
     if (_keypair == null) return;
 
     final balance = await _getBalance();
-    print('[HealthLog.Solana] Balance check: $balance lamports '
+    debugPrint('[HealthLog.Solana] Balance check: $balance lamports '
         '(min=$_minBalanceLamports)');
     if (balance >= _minBalanceLamports) {
       _funded = true;
@@ -117,7 +118,7 @@ class DevnetSolanaService implements SolanaConsentService {
     }
 
     try {
-      print('[HealthLog.Solana] Requesting airdrop of 1 SOL for '
+      debugPrint('[HealthLog.Solana] Requesting airdrop of 1 SOL for '
           '$_walletAddress');
       final client = _getClient();
       final sig = await client.requestAirdrop(
@@ -125,7 +126,7 @@ class DevnetSolanaService implements SolanaConsentService {
         lamports: 1000000000,
         commitment: Commitment.confirmed,
       );
-      print('[HealthLog.Solana] Airdrop tx: $sig');
+      debugPrint('[HealthLog.Solana] Airdrop tx: $sig');
 
       // Poll balance up to 30s for confirmation.
       for (var i = 0; i < 15; i++) {
@@ -134,14 +135,15 @@ class DevnetSolanaService implements SolanaConsentService {
         if (b >= _minBalanceLamports) {
           _funded = true;
           await _secureStorage.write(key: _walletFundedKey, value: 'true');
-          print('[HealthLog.Solana] Airdrop confirmed. Balance: $b lamports');
+          debugPrint(
+              '[HealthLog.Solana] Airdrop confirmed. Balance: $b lamports');
           return;
         }
       }
-      print('[HealthLog.Solana] Airdrop submitted but balance still '
+      debugPrint('[HealthLog.Solana] Airdrop submitted but balance still '
           'below threshold after 30s');
     } catch (e) {
-      print('[HealthLog.Solana] Airdrop failed (likely rate-limited): $e');
+      debugPrint('[HealthLog.Solana] Airdrop failed (likely rate-limited): $e');
     }
   }
 
@@ -173,11 +175,11 @@ class DevnetSolanaService implements SolanaConsentService {
         signers: [_keypair!],
         commitment: Commitment.confirmed,
       );
-      print('[HealthLog.Solana] Memo committed. Tx: $signature');
+      debugPrint('[HealthLog.Solana] Memo committed. Tx: $signature');
       _lastError = null;
       return signature;
     } catch (e) {
-      print('[HealthLog.Solana] sendMemo failed: $e');
+      debugPrint('[HealthLog.Solana] sendMemo failed: $e');
       _lastError = e.toString();
       // Fall back to a locally-generated devnet signature on failure
       return 'devnet_fallback_${_uuid.v4().replaceAll('-', '')}';
@@ -237,6 +239,7 @@ class DevnetSolanaService implements SolanaConsentService {
       extra: {
         'grantId': grantId,
         'sessionId': sessionId,
+        'manifestHash': manifestHash,
         'recipientWallet': recipientWallet,
         'scope': scope.name,
         'purpose': purpose.name,
@@ -341,8 +344,7 @@ class DevnetSolanaService implements SolanaConsentService {
   }) async {
     final grant = _grants.values
         .where((g) =>
-            g.sessionId == sessionId &&
-            g.recipientWallet == recipientWallet)
+            g.sessionId == sessionId && g.recipientWallet == recipientWallet)
         .lastOrNull;
 
     if (grant == null) {
@@ -383,15 +385,13 @@ class DevnetSolanaService implements SolanaConsentService {
       aiReportHashMatch: true,
       scopeMatch: true,
       rawDataNotExposed: true,
-      errorMessage: isActive
-          ? null
-          : 'Access ${grant.revoked ? "revoked" : "expired"}.',
+      errorMessage:
+          isActive ? null : 'Access ${grant.revoked ? "revoked" : "expired"}.',
     );
   }
 
   @override
-  Future<List<AccessLog>> getAccessHistory(
-      {required String sessionId}) async {
+  Future<List<AccessLog>> getAccessHistory({required String sessionId}) async {
     return _accessLogs.where((l) => l.sessionId == sessionId).toList();
   }
 

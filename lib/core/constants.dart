@@ -107,6 +107,7 @@ class AppConstants {
   static const Map<String, List<String>> columnGroups = {
     'Base Info': [
       'PACKET_TYPE',
+      'DEVICE_NAME',
       'CLOCK_TIME',
       'ms_ELAPSED',
       'TRIGGER_COUNT',
@@ -226,7 +227,8 @@ class AppConstants {
 
   // Chart display settings
   static const int eegDisplayWindowSeconds = 10;
-  static const int eegDisplayDecimation = 4; // Show every 4th sample for performance
+  static const int eegDisplayDecimation =
+      4; // Show every 4th sample for performance
   static const int fnirsDisplayWindowSeconds = 20;
   static const int imuDisplayWindowSeconds = 10;
 

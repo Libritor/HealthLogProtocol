@@ -54,8 +54,7 @@ class MockVerificationService implements VerificationService {
     );
     return VerificationResult(
       claimType: 'session_ownership',
-      claimDescription:
-          'This user has an authorized MuseLog session',
+      claimDescription: 'This user has an authorized MuseLog session',
       isValid: manifestHash.isNotEmpty && ownerWallet.isNotEmpty,
       proofData: proofData,
       proofType: 'mock_hash',
@@ -87,13 +86,17 @@ class MockVerificationService implements VerificationService {
     required String manifestHash,
   }) async {
     final hashMatch = report.inputManifestHash == manifestHash;
+    final expectedOutputHash =
+        _hashingService.hashCanonicalJson(report.summaryJson);
+    final outputHashMatch = report.outputHash == expectedOutputHash;
     return VerificationResult(
       claimType: 'ai_report_chain',
       claimDescription:
           'This AI summary was generated from a committed wearable session',
-      isValid: hashMatch && report.verifierStatus,
+      isValid: hashMatch && outputHashMatch && report.verifierStatus,
       proofData: _hashingService.hashString(
-        '${report.reportId}:${report.inputManifestHash}:${report.outputHash}',
+        '${report.reportId}:${report.inputManifestHash}:'
+        '${report.outputHash}:$expectedOutputHash',
       ),
       proofType: 'mock_hash',
     );

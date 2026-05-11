@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../../domain/models/solana_models.dart';
 import '../crypto/hashing_service.dart';
@@ -25,7 +24,7 @@ class AIReportService {
     final summaryJson = await _buildSummary(session, scope);
 
     final reportId = _uuid.v4();
-    final outputHash = _hashingService.hashString(jsonEncode(summaryJson));
+    final outputHash = _hashingService.hashCanonicalJson(summaryJson);
 
     return AIReport(
       reportId: reportId,
@@ -107,7 +106,10 @@ class AIReportService {
     }
 
     if (session.signalTypes.contains('fNIRS')) {
-      details['fNIRS'] = {'present': true, 'type': 'Near-infrared spectroscopy'};
+      details['fNIRS'] = {
+        'present': true,
+        'type': 'Near-infrared spectroscopy'
+      };
     }
 
     if (session.signalTypes.contains('PPG')) {

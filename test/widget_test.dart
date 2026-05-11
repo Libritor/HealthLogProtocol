@@ -7,7 +7,7 @@ import 'package:healthlog/main.dart';
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(
-      child: HealthLogApp(),
+      child: HealthLogProtocolApp(),
     ));
 
     expect(find.byType(MaterialApp), findsOneWidget);

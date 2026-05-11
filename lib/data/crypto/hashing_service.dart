@@ -18,6 +18,15 @@ class HashingService {
     return digest.toString();
   }
 
+  /// Stable JSON encoder for crypto-bound payloads.
+  ///
+  /// Dart preserves map insertion order, but crypto verification should not
+  /// depend on how a caller happened to construct a map. This recursively sorts
+  /// object keys before JSON encoding.
+  String canonicalJson(Object? value) => jsonEncode(_canonicalize(value));
+
+  String hashCanonicalJson(Object? value) => hashString(canonicalJson(value));
+
   /// Build a SessionManifest from a WearableSession.
   /// Uses session.startedAt as createdAt for deterministic hashing --
   /// the same session fields always produce the same manifest hash.
@@ -41,7 +50,7 @@ class HashingService {
 
   /// Hash of an AI report's summary content for verification.
   String hashAIReport(AIReport report) {
-    final payload = jsonEncode({
+    final payload = {
       'reportId': report.reportId,
       'sessionId': report.sessionId,
       'reportType': report.reportType,
@@ -49,7 +58,22 @@ class HashingService {
       'permittedDataScope': report.permittedDataScope.name,
       'summaryJson': report.summaryJson,
       'createdAt': report.createdAt.toIso8601String(),
-    });
-    return hashString(payload);
+    };
+    return hashCanonicalJson(payload);
+  }
+
+  Object? _canonicalize(Object? value) {
+    if (value is Map) {
+      final entries = value.entries
+          .map((entry) =>
+              MapEntry(entry.key.toString(), _canonicalize(entry.value)))
+          .toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      return Map<String, Object?>.fromEntries(entries);
+    }
+    if (value is Iterable) {
+      return value.map(_canonicalize).toList(growable: false);
+    }
+    return value;
   }
 }
