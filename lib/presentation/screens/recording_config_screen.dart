@@ -55,41 +55,51 @@ class _RecordingConfigScreenState
     final hasMuse = selectedDevices.isNotEmpty;
     final hasOura = ouraAuth.status == OuraConnectionStatus.connected;
     final hasRayBan = raybanSelected.isNotEmpty;
+    final hasAnySource = hasMuse || hasOura || hasRayBan;
 
-    final canStart = (hasMuse || hasOura || hasRayBan) &&
-        (!hasMuse || selectedColumns.isNotEmpty);
+    final canStart = hasAnySource && (!hasMuse || selectedColumns.isNotEmpty);
 
     return Scaffold(
       backgroundColor: AppColors.ink,
       appBar: AppBar(title: const Text('Configure Recording')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _sessionInfoCard(
-                  hasMuse: hasMuse,
-                  selectedDevices: selectedDevices,
-                  hasOura: hasOura,
-                  hasRayBan: hasRayBan,
-                  raybanCount: raybanSelected.length,
-                ),
-                if (hasMuse) ...[
-                  const SizedBox(height: 16),
-                  _deviceNamesCard(selectedDevices),
-                  const SizedBox(height: 16),
-                  _dataColumnsCard(selectedColumns),
-                ],
-                if (hasOura) ...[
-                  const SizedBox(height: 16),
-                  _ouraCard(),
-                ],
-              ],
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          key: const PageStorageKey('recording-config-form'),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          children: [
+            _sessionInfoCard(
+              hasMuse: hasMuse,
+              selectedDevices: selectedDevices,
+              hasOura: hasOura,
+              hasRayBan: hasRayBan,
+              raybanCount: raybanSelected.length,
             ),
-          ),
-          _startButton(canStart),
-        ],
+            if (!hasAnySource) ...[
+              const SizedBox(height: 16),
+              _noDataSourceCard(),
+            ],
+            if (hasMuse) ...[
+              const SizedBox(height: 16),
+              _deviceNamesCard(selectedDevices),
+              const SizedBox(height: 16),
+              _dataColumnsCard(selectedColumns),
+            ],
+            if (hasOura) ...[
+              const SizedBox(height: 16),
+              _ouraCard(),
+            ],
+            if (hasRayBan) ...[
+              const SizedBox(height: 16),
+              _raybanCard(raybanSelected.length),
+            ],
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: _startButton(canStart),
       ),
     );
   }
@@ -148,7 +158,46 @@ class _RecordingConfigScreenState
                     avatar: const Icon(Icons.visibility, size: 16),
                     label: Text('$raybanCount Ray-Ban media'),
                   ),
+                if (!hasMuse && !hasOura && !hasRayBan)
+                  const Chip(
+                    avatar: Icon(Icons.info_outline, size: 16),
+                    label: Text('No source selected'),
+                  ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _noDataSourceCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber, color: AppColors.warning),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Choose a Data Source',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Go back to Devices and select a Muse headband, connect '
+                    'Oura, or attach Ray-Ban media before recording.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.onSurfaceMuted,
+                        ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -237,20 +286,30 @@ class _RecordingConfigScreenState
             const SizedBox(height: 8),
             Row(
               children: [
-                OutlinedButton(
-                  onPressed: () {
-                    ref
-                        .read(selectedColumnsProvider.notifier)
-                        .selectAll();
-                  },
-                  child: const Text('Select All'),
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                    ),
+                    onPressed: () {
+                      ref
+                          .read(selectedColumnsProvider.notifier)
+                          .selectAll();
+                    },
+                    child: const Text('Select All'),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: () {
-                    ref.read(selectedColumnsProvider.notifier).clearAll();
-                  },
-                  child: const Text('Clear All'),
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                    ),
+                    onPressed: () {
+                      ref.read(selectedColumnsProvider.notifier).clearAll();
+                    },
+                    child: const Text('Clear All'),
+                  ),
                 ),
               ],
             ),
@@ -313,6 +372,37 @@ class _RecordingConfigScreenState
     );
   }
 
+  Widget _raybanCard(int mediaCount) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.visibility, size: 18, color: AppColors.info),
+                const SizedBox(width: 8),
+                Text(
+                  'Ray-Ban Media',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$mediaCount selected photo/video file(s) will be attached to '
+              'this HealthLog session.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _startButton(bool canStart) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -320,7 +410,7 @@ class _RecordingConfigScreenState
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),

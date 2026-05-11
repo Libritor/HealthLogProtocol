@@ -1477,11 +1477,13 @@ class _LiveSessionScreenState extends ConsumerState<LiveSessionScreen>
             child: ElevatedButton.icon(
               onPressed: _togglePauseResume,
               icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
-              label: Text(isPaused ? 'Resume' : 'Pause'),
+              label: _controlButtonLabel(isPaused ? 'Resume' : 'Pause'),
               style: ElevatedButton.styleFrom(
                 backgroundColor:
                     isPaused ? Colors.green : Colors.orange,
                 foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
               ),
             ),
           ),
@@ -1490,7 +1492,11 @@ class _LiveSessionScreenState extends ConsumerState<LiveSessionScreen>
             child: OutlinedButton.icon(
               onPressed: _addTrigger,
               icon: const Icon(Icons.flag),
-              label: const Text('Add Marker'),
+              label: _controlButtonLabel('Add Marker'),
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -1502,10 +1508,23 @@ class _LiveSessionScreenState extends ConsumerState<LiveSessionScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _controlButtonLabel(String text) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        text,
+        maxLines: 1,
+        softWrap: false,
       ),
     );
   }
