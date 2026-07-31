@@ -211,10 +211,17 @@ serialization of $P$, and
 \mathrm{baselineHash} \;=\; \mathrm{SHA\text{-}256}\big(\mathrm{canon}(P)\big).
 \]
 Key sorting makes the commitment independent of how a producer happened to
-assemble the object. The same rule is applied to the feature-schema spec to
-yield \code{featureSchemaHash}, which lets a consumer confirm it is extracting
-features the same way the baseline expects---a necessary condition for a
-baseline to transfer correctly.
+assemble the object. Because a baseline anchored by one app must verify in
+another---possibly written in a different language---$\mathrm{canon}$ also pins
+number formatting: whole-valued numbers render without a decimal point
+($2.0\!\to\!\texttt{2}$, $0.0\!\to\!\texttt{0}$) and all others via shortest
+round-trip, so a Dart (Flutter) producer and a Node.js verifier emit
+byte-identical strings. Without this rule the two diverge---Dart's default
+encoder renders $0.0$ as \code{"0.0"} where JavaScript renders \code{"0"}---and
+the commitments silently mismatch. The same rule is applied to the
+feature-schema spec to yield \code{featureSchemaHash}, which lets a consumer
+confirm it is extracting features the same way the baseline expects---a
+necessary condition for a baseline to transfer correctly.
 
 \subsection{Anchor and verify}
 
@@ -322,6 +329,15 @@ receipts.}
 unchanged on-chain commitment correctly reported \textsc{failed}. Integrity is
 not advisory; it is cryptographically bound to every value in the parameter set.
 
+\paragraph{Cross-language parity.} The two independent implementations agree.
+For all three sample baselines, the Dart (Flutter) hasher and the Node.js
+reference tool produce byte-identical commitments---enforced as an automated
+golden test (\code{test/baseline\_parity\_test.dart}) that fails if either
+canonical serializer drifts. This is the property that makes ``anchor in app A,
+verify in app B'' real rather than aspirational; before the shared number rule,
+the same EEG baseline hashed to \code{a05fdf36\ldots} in Dart versus
+\code{509c8630\ldots} in Node.
+
 \paragraph{Verification latency.} Over eight \code{getSlot} probes against the
 RPC Fast mainnet endpoint we observed 101/106/371\,ms
 (min/median/max), mean 162\,ms, dominated by two cold outliers. A full baseline
@@ -389,12 +405,14 @@ We deliberately avoid overclaiming.
   transaction, matching the HealthLog MVP. Structured, queryable state
   (an Anchor program with per-baseline accounts and native revocation flags) is
   the intended next step; memos are provenance, not a state machine.
-\item \textbf{Cross-language canonicalization.} Our reference and Dart
-  implementations share the canonicalization \emph{rule} (recursive key sort,
-  UTF-8, compact separators). Exact byte-identical hashing across languages
-  additionally requires pinning numeric formatting; a production spec fixes this
-  by hashing a canonical byte serialization of the baseline, and we flag it
-  rather than paper over it.
+\item \textbf{Cross-language canonicalization (resolved, with a residual edge).}
+  The Dart and Node implementations now emit byte-identical canonical strings
+  and hashes for realistic baselines, verified by a golden test
+  (\S\ref{sec:eval}). The pinned number rule covers normal-range decimals; we do
+  not guarantee agreement for pathological magnitudes (values requiring
+  exponent notation), which do not arise in EEG/EMG/HRV baselines but which a
+  formal spec would still need to fix, e.g.\ by additionally content-addressing
+  the transmitted byte blob.
 \item \textbf{No cryptographic template protection yet.} As above, the sensitive
   sharing scope discloses a real template.
 \item \textbf{Devnet demonstration.} Reported anchors are on devnet; the mainnet

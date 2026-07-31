@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../../domain/models/baseline_models.dart';
 import '../crypto/hashing_service.dart';
@@ -31,10 +32,10 @@ class BaselineHashing {
     String? ownerWallet,
     DateTime? createdAt,
   }) {
-    final baselineHash = _hashing.hashCanonicalJson(parameters);
+    final baselineHash = hashParameters(parameters);
     final featureSchemaHash = featureSchemaSpec == null
         ? null
-        : _hashing.hashCanonicalJson(featureSchemaSpec);
+        : _hashing.hashString(canonicalSerialize(featureSchemaSpec));
 
     return WearableBaseline(
       baselineId: _uuid.v4(),
@@ -57,7 +58,33 @@ class BaselineHashing {
   /// verifier: a consumer re-hashes the parameters it received and checks the
   /// result against the on-chain commitment.
   String hashParameters(Map<String, dynamic> parameters) =>
-      _hashing.hashCanonicalJson(parameters);
+      _hashing.hashString(canonicalSerialize(parameters));
+
+  /// Language-agnostic canonical serialization. Sorted keys, no whitespace, and
+  /// a number rule that MATCHES the Node reference tool
+  /// (tools/baseline_anchor/lib_baseline.mjs canonicalSerialize): whole-valued
+  /// numbers render without a decimal point (2.0 -> "2", 0.0 -> "0"), so a
+  /// baseline hashed in Flutter verifies in a Node.js service and vice versa.
+  static String canonicalSerialize(Object? v) {
+    if (v == null) return 'null';
+    if (v is bool) return v ? 'true' : 'false';
+    if (v is num) {
+      if (v is int) return v.toString();
+      final d = v.toDouble();
+      if (!d.isFinite) throw StateError('non-finite number in baseline');
+      if (d == d.roundToDouble()) return d.toInt().toString();
+      return d.toString();
+    }
+    if (v is String) return jsonEncode(v);
+    if (v is List) {
+      return '[${v.map(canonicalSerialize).join(',')}]';
+    }
+    if (v is Map) {
+      final keys = v.keys.map((k) => k.toString()).toList()..sort();
+      return '{${keys.map((k) => '${jsonEncode(k)}:${canonicalSerialize(v[k])}').join(',')}}';
+    }
+    throw StateError('unserializable type: ${v.runtimeType}');
+  }
 
   /// Keys that must never appear as a payload (array/object) in an on-chain
   /// envelope. Mirrors the Node reference tool's FORBIDDEN_KEYS.

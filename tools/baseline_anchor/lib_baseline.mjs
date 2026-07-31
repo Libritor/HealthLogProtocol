@@ -48,15 +48,30 @@ const FORBIDDEN_KEYS = new Set([
 // Canonicalization + hashing
 // ---------------------------------------------------------------------------
 
-/** Recursively sort object keys so hashing is stable regardless of key order. */
-export function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const k of Object.keys(value).sort()) out[k] = canonicalize(value[k]);
-    return out;
+/**
+ * Language-agnostic canonical serialization. Sorted keys, no whitespace, and a
+ * number rule that MATCHES the Dart implementation
+ * (BaselineHashing._canonicalSerialize): whole-valued numbers render without a
+ * decimal point (2.0 -> "2", 0.0 -> "0"), everything else via shortest
+ * round-trip. This is what makes a baseline hashed in Flutter verify in a
+ * Node.js service and vice versa.
+ */
+export function canonicalSerialize(v) {
+  if (v === null) return 'null';
+  const t = typeof v;
+  if (t === 'boolean') return v ? 'true' : 'false';
+  if (t === 'number') {
+    if (!Number.isFinite(v)) throw new Error('non-finite number in baseline');
+    // JS String() already renders 2.0 as "2" and 0.0 as "0".
+    return String(v);
   }
-  return value;
+  if (t === 'string') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(canonicalSerialize).join(',') + ']';
+  if (t === 'object') {
+    const keys = Object.keys(v).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalSerialize(v[k])).join(',') + '}';
+  }
+  throw new Error('unserializable type: ' + t);
 }
 
 export function sha256Hex(input) {
@@ -64,9 +79,9 @@ export function sha256Hex(input) {
   return crypto.createHash('sha256').update(buf).digest('hex');
 }
 
-/** Deterministic SHA-256 of any JSON-serializable object (key-order-independent). */
+/** Deterministic, cross-language SHA-256 of a JSON-serializable object. */
 export function hashObject(obj) {
-  return sha256Hex(JSON.stringify(canonicalize(obj)));
+  return sha256Hex(canonicalSerialize(obj));
 }
 
 // ---------------------------------------------------------------------------
