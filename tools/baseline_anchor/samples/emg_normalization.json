@@ -1,0 +1,28 @@
+{
+  "_comment": "sEMG normalization baseline: per-user maximum voluntary contraction (MVC) and resting RMS per channel, used to normalize EMG so gesture/effort classifiers transfer across sessions and apps without re-recording an MVC trial.",
+  "baseline": {
+    "channels": ["biceps_brachii", "triceps_brachii"],
+    "sampleRateHz": 1000,
+    "mvcMicrovolts": [842.3, 611.7],
+    "restRmsMicrovolts": [7.4, 6.1],
+    "bandpassHz": [20, 450],
+    "notchHz": 60,
+    "electrode": "Ag/AgCl, 20mm spacing"
+  },
+  "meta": {
+    "signal": "emg",
+    "model": "emg-mvc-normalization",
+    "modelVersion": "1.0.0",
+    "featureSchema": "semg-2ch-rms",
+    "dims": { "features": 2, "clusters": 0 },
+    "recordedSeconds": 120,
+    "validUntil": "2027-01-31T00:00:00Z",
+    "ts": "2026-07-31T00:00:00Z",
+    "featureSchemaSpec": {
+      "features": ["rms_biceps", "rms_triceps"],
+      "normalization": "percent_mvc",
+      "window": { "seconds": 0.25, "hopSeconds": 0.05 },
+      "notes": "Effort features expressed as % of per-user MVC. Consumer must apply the same bandpass/notch before normalizing."
+    }
+  }
+}

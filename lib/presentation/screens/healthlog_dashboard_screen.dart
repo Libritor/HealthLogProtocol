@@ -9,6 +9,7 @@ import '../../data/adapters/muselog_adapter.dart';
 import '../../domain/models/solana_models.dart';
 import '../providers/solana_providers.dart';
 import 'about_screen.dart';
+import 'baseline_passport_screen.dart';
 import 'muselog_source_screen.dart';
 import 'session_detail_screen.dart';
 import 'verifier_screen.dart';
@@ -272,6 +273,19 @@ class _HealthLogDashboardScreenState
                   subtitle: 'Bring any wearable CSV into the protocol',
                   active: true,
                   onTap: _importCsv,
+                ),
+                _wearableSourceCard(
+                  theme,
+                  icon: Icons.badge_outlined,
+                  title: 'Baseline Passport',
+                  subtitle:
+                      'Anchor EEG / EMG / HRV baselines — reuse BCIs, no re-recording',
+                  active: true,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const BaselinePassportScreen()),
+                  ),
                 ),
                 _AdaptersComingSoonStrip(onTap: _showComingSoonSnackBar),
               ],

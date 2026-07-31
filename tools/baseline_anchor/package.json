@@ -1,0 +1,15 @@
+{
+  "name": "healthlog-baseline-anchor",
+  "version": "0.1.0",
+  "description": "Anchor and verify wearable baselines (EEG/EMG/HRV) on Solana. Only a commitment hash + shape metadata goes on-chain; raw baseline parameters stay encrypted off-chain. RPC Fast is the mainnet verification rail.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "anchor:eeg": "node anchor_baseline.mjs --baseline samples/eeg_gmm_arousal.json",
+    "anchor:emg": "node anchor_baseline.mjs --baseline samples/emg_normalization.json",
+    "anchor:hrv": "node anchor_baseline.mjs --baseline samples/hrv_resting.json",
+    "dry": "node anchor_baseline.mjs --baseline samples/eeg_gmm_arousal.json --dry-run"
+  },
+  "license": "MIT",
+  "note": "Depends on @solana/web3.js, bs58 (resolved from ~/node_modules via parent-dir lookup). RPC/keypair read from ~/.axiom_resolve/."
+}

@@ -1,0 +1,18 @@
+{
+  "network": "devnet",
+  "owner": "EKRgJifhv4xsfRNFnSLY93NDoLVa39udENVQLC59s4sg",
+  "signal": "eeg",
+  "model": "gmm-arousal",
+  "modelVersion": "1.0.0",
+  "featureSchema": "muse-bandpower-4",
+  "baselineHash": "509c8630cca738dbd4ade4a08b450c6cd700861136870d30e94a8b19bcfda1ca",
+  "featureSchemaHash": "9235292c574d879f1c8dd7a5f8e84616a42e0ddc47c1703bc7561c5cf13e7d13",
+  "dims": {
+    "features": 4,
+    "clusters": 3
+  },
+  "txSignature": "5JsYqPH3QbEyvFc5FoEnWDHwo83wgDJh1nbA9zqwcKKf3igrnk6uqmTCdzzdARx2tvpQKyuEqSs4mQPS5XhewMzK",
+  "explorer": "https://explorer.solana.com/tx/5JsYqPH3QbEyvFc5FoEnWDHwo83wgDJh1nbA9zqwcKKf3igrnk6uqmTCdzzdARx2tvpQKyuEqSs4mQPS5XhewMzK?cluster=devnet",
+  "ts": "2026-07-31T00:00:00Z",
+  "anchoredAt": "2026-07-31T20:34:24.444Z"
+}

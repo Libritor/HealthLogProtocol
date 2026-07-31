@@ -1,0 +1,38 @@
+{
+  "_comment": "EEG arousal baseline: a per-user GMM over Muse band-power features. `baseline` is the private, off-chain calibration (identical shape to HealthLog's GmmModelState); `meta` is the public envelope descriptor. Only meta + hash(baseline) go on-chain.",
+  "baseline": {
+    "featureCols": ["theta", "alpha", "beta", "tbr"],
+    "clusterToArousal": { "0": "low", "1": "medium", "2": "high" },
+    "scalerMean": [12.41, 9.83, 6.12, 2.07],
+    "scalerScale": [3.11, 2.44, 1.63, 0.58],
+    "gmmWeights": [0.42, 0.35, 0.23],
+    "gmmMeans": [
+      [-0.81, 0.62, -0.44, -0.70],
+      [0.10, -0.05, 0.08, 0.02],
+      [0.79, -0.61, 0.55, 0.83]
+    ],
+    "gmmCovariances": [
+      [[0.55, 0.02, 0.01, 0.00], [0.02, 0.48, 0.00, 0.01], [0.01, 0.00, 0.51, 0.02], [0.00, 0.01, 0.02, 0.44]],
+      [[0.61, 0.01, 0.00, 0.02], [0.01, 0.59, 0.01, 0.00], [0.00, 0.01, 0.63, 0.01], [0.02, 0.00, 0.01, 0.57]],
+      [[0.49, 0.03, 0.02, 0.01], [0.03, 0.52, 0.01, 0.02], [0.02, 0.01, 0.47, 0.00], [0.01, 0.02, 0.00, 0.53]]
+    ]
+  },
+  "meta": {
+    "signal": "eeg",
+    "model": "gmm-arousal",
+    "modelVersion": "1.0.0",
+    "featureSchema": "muse-bandpower-4",
+    "dims": { "features": 4, "clusters": 3 },
+    "recordedSeconds": 300,
+    "validUntil": "2027-07-31T00:00:00Z",
+    "ts": "2026-07-31T00:00:00Z",
+    "featureSchemaSpec": {
+      "device": "Muse S / Muse 2",
+      "channels": ["TP9", "AF7", "AF8", "TP10"],
+      "features": ["theta", "alpha", "beta", "tbr"],
+      "window": { "seconds": 4, "hopSeconds": 1 },
+      "units": "relative band power (log)",
+      "notes": "Theta/beta ratio (tbr) computed per epoch. Must match consumer feature extractor exactly for the baseline to transfer."
+    }
+  }
+}

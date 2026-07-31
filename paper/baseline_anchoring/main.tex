@@ -1,0 +1,474 @@
+\documentclass[10pt,twocolumn]{article}
+
+% ---------------------------------------------------------------------------
+% Portable wearable baselines on a public ledger.
+% Self-contained: uses only base LaTeX packages so it compiles anywhere.
+% ---------------------------------------------------------------------------
+\usepackage[letterpaper,margin=0.75in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=1.2em}
+
+\definecolor{codebg}{RGB}{245,245,247}
+\definecolor{codekw}{RGB}{120,60,200}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=none,
+  aboveskip=6pt, belowskip=6pt,
+  xleftmargin=4pt, xrightmargin=4pt,
+}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\title{\vspace{-2.5em}\bfseries Wearable Baselines on a Public Ledger:\\
+Portable, Owner-Controlled Calibration for\\Cross-App BCI and Biosignal Interfaces}
+
+\author{Alexandru Vicol\\
+\small University of Toronto, Department of Electrical \& Computer Engineering\\
+\small \texttt{HealthLog Protocol} --- built on Solana + RPC Fast\\
+\small \emph{Draft, \today}}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Every consumer neurotechnology and biosignal application re-derives the same
+thing on first launch: a \emph{per-user baseline}. An EEG brain--computer
+interface (BCI) fits a personal arousal or intent model; an EMG interface
+records a maximum-voluntary-contraction (MVC) trial to normalize effort; an HRV
+app spends days establishing resting norms. These baselines are expensive to
+collect, physiologically slow to change, and today are trapped inside whichever
+app produced them. A user who installs a second app starts from zero. There is
+no portable, verifiable, owner-controlled representation of ``my calibration.''
+
+We present a design and working implementation that treats a baseline as a
+first-class, portable asset. The fitted parameters stay encrypted on the user's
+device; only a SHA-256 \emph{commitment} plus non-identifying shape metadata is
+anchored on a public ledger (Solana). Any third-party app that later receives
+the baseline out of band re-hashes it and checks it against the on-chain
+commitment before trusting it---obtaining integrity, provenance, ownership, and
+revocation without the raw biometric ever touching the chain. We extend the
+HealthLog consent protocol (Solana Colosseum, 2026) from \emph{sessions} to
+\emph{baselines}, using RPC Fast as the mainnet verification rail. We anchor and
+round-trip-verify real EEG, EMG, and HRV baselines on Solana devnet, show that
+tampering with a single parameter is detected, measure a median verification
+read latency of $\approx\!106$\,ms, and enforce the privacy invariant with a
+runtime gate and automated tests. We close with an honest account of what the
+current commitment-only design does \emph{not} yet provide---zero-knowledge
+proofs of baseline quality and cryptographic biometric-template protection---and
+a roadmap toward them.
+\end{abstract}
+
+\section{Introduction}
+
+Consumer wearables and BCIs have made biosignals---EEG, EMG, HRV, EDA,
+PPG---cheap to record. What has \emph{not} become cheap is \emph{calibration}.
+Because physiology varies across people and electrode placements, almost every
+serious application begins by estimating a user-specific baseline:
+
+\begin{itemize}
+\item An EEG focus/relaxation BCI fits a personal model over band-power
+  features (e.g.\ a Gaussian mixture over $\theta,\alpha,\beta$ and the
+  theta/beta ratio) so that ``high arousal'' means high \emph{for this user}.
+\item An EMG gesture or prosthetic interface records an MVC trial and resting
+  RMS per channel, so effort can be expressed as a percentage of that user's
+  own maximum.
+\item An HRV stress/recovery app accumulates a multi-day resting baseline
+  (SDNN, RMSSD, LF/HF) so a live reading is scored relative to the user rather
+  than to a population.
+\end{itemize}
+
+These baselines share three properties. They are \textbf{costly}: minutes of
+guided recording for EEG/EMG, days for HRV. They are \textbf{slow-changing}:
+useful for weeks to months. And they are \textbf{siloed}: each app stores its
+baseline privately, so the cost is paid again for every new app, device, or
+research study. A user who has already recorded a perfectly good EEG arousal
+baseline in app~A cannot hand it to app~B; app~B re-records from scratch, and
+neither app can prove to a third party (a clinician, a research cohort, a second
+device) that the baseline it holds is authentic, unmodified, and owned by the
+person presenting it.
+
+We argue that a baseline should be a \emph{portable, verifiable, owner-controlled
+object}, and that a public ledger is the right substrate for its
+\emph{integrity and consent envelope}---though emphatically not for the biometric
+data itself. Our contributions:
+
+\begin{enumerate}
+\item A \textbf{baseline-commitment design} in which only a SHA-256 hash of the
+  canonicalized parameters plus shape metadata (signal type, model family,
+  feature-schema id, dimensionality, recalibration horizon) is anchored
+  on-chain. The fitted parameters never appear on-chain in any form.
+\item An \textbf{integration into HealthLog}, extending its Colosseum consent
+  protocol from sessions to baselines, with \textbf{RPC Fast} as the mainnet
+  write/verification rail and a free devnet demo rail.
+\item A \textbf{working reference implementation and evaluation}: real EEG, EMG,
+  and HRV baselines anchored and verified on Solana devnet; single-parameter
+  tamper detection; a runtime privacy gate with automated tests; and read-latency
+  measurements against RPC Fast.
+\item An \textbf{honest security analysis} that names the residual risks---
+  biometric-template leakage under parameter sharing, linkage across
+  commitments, and the absence of zero-knowledge quality proofs---and a roadmap.
+\end{enumerate}
+
+\section{Background and Motivation}
+
+\paragraph{What a baseline is, concretely.} In the HealthLog EEG pipeline, the
+baseline is a serialized \code{GmmModelState}: the feature columns, a
+standardization (mean/scale per feature), Gaussian-mixture weights, means, and
+covariances, and a mapping from cluster index to an arousal label. This is
+exactly the object a downstream inference step loads to classify live EEG
+without re-training. An EMG baseline is a small vector of per-channel MVC and
+resting-RMS values plus the filter settings used to obtain them; an HRV baseline
+is a handful of resting time- and frequency-domain statistics with the window
+over which they were computed. In all three cases the baseline is (i) small
+(hundreds of bytes to a few kilobytes), (ii) sufficient to make a second app's
+inference work, and (iii) sensitive, because it is derived from a person's
+physiology.
+
+\paragraph{Why not just copy the file?} A user could in principle export the
+baseline file and import it elsewhere. Two things are missing. First,
+\emph{integrity and provenance}: the receiving app has no way to know the file
+was not altered, or that it belongs to the person presenting it, or when it was
+recorded and whether it is still fresh. Second, \emph{control}: once copied, the
+user has no mechanism to revoke a baseline that leaked or to signal that it has
+been superseded by a recalibration. A public commitment plus a consent envelope
+supplies exactly these missing pieces without becoming a data-storage system for
+the biometric.
+
+\section{Threat and Trust Model}
+
+We assume: (i) the user's device holds the raw baseline and the signing key and
+is trusted; (ii) the ledger is an untrusted-but-tamper-evident public bulletin
+board---anything written to it may be read by anyone forever; (iii) recipient
+apps are semi-trusted---they should receive only the scope the user approves and
+must be able to \emph{verify} what they receive; and (iv) RPC endpoints (RPC
+Fast, public devnet) are untrusted for confidentiality but are used only for
+integrity-checkable reads and for broadcasting already-signed transactions.
+
+The design goals follow directly:
+\begin{itemize}
+\item \textbf{Confidentiality:} raw parameters never leave the device except
+  under explicit, scoped user consent, and \emph{never} appear on-chain.
+\item \textbf{Integrity:} a recipient can detect any modification of the
+  baseline it received.
+\item \textbf{Provenance \& ownership:} the commitment is bound to the owner's
+  wallet and a timestamp.
+\item \textbf{Revocability:} the owner can invalidate a baseline.
+\item \textbf{Minimality:} the on-chain footprint is a hash and small metadata,
+  nothing more.
+\end{itemize}
+
+\section{Design}
+
+\subsection{The baseline manifest (on-chain envelope)}
+
+Anchoring a baseline writes a single memo-program transaction whose payload is a
+compact JSON envelope. Crucially, the envelope carries a \emph{commitment}, not
+the data:
+
+\begin{lstlisting}
+{ "type": "baseline_commitment", "v": 1,
+  "owner": "<wallet>",
+  "signal": "eeg",              // eeg|emg|hrv|...
+  "model": "gmm-arousal",
+  "modelVersion": "1.0.0",
+  "featureSchema": "muse-bandpower-4",
+  "featureSchemaHash": "9235...e7d13",
+  "baselineHash": "509c...da1ca",   // SHA-256 of params
+  "dims": { "features": 4, "clusters": 3 },
+  "recordedSeconds": 300,
+  "validUntil": "2027-07-31T00:00:00Z",
+  "ts": "2026-07-31T00:00:00Z" }
+\end{lstlisting}
+
+The \code{baselineHash} is the load-bearing field. \code{dims},
+\code{recordedSeconds}, and \code{validUntil} are deliberately coarse:
+dimensionality and recording length are context, not identity, and the
+recalibration horizon lets a verifier reject a stale baseline. \code{signal} and
+\code{model} are short tags so a marketplace of apps can discover which baselines
+they can consume.
+
+\subsection{Canonical commitment}
+
+Let $P$ be the fitted parameter object. Define
+$\mathrm{canon}(P)$ as the recursively key-sorted, whitespace-free JSON
+serialization of $P$, and
+\[
+\mathrm{baselineHash} \;=\; \mathrm{SHA\text{-}256}\big(\mathrm{canon}(P)\big).
+\]
+Key sorting makes the commitment independent of how a producer happened to
+assemble the object. The same rule is applied to the feature-schema spec to
+yield \code{featureSchemaHash}, which lets a consumer confirm it is extracting
+features the same way the baseline expects---a necessary condition for a
+baseline to transfer correctly.
+
+\subsection{Anchor and verify}
+
+The lifecycle mirrors, and reuses, HealthLog's session-consent machinery:
+
+\begin{lstlisting}
+Record baseline (once)
+  -> canon + SHA-256  -> baselineHash
+    -> assert envelope carries no raw params
+      -> memo tx (anchor)  ==> tx signature
+--------------------------------------------------
+Consumer app receives baseline (out of band)
+  -> re-hash received params
+    -> read commitment at tx (via RPC Fast)
+      -> check: type, hash==, owner==, fresh, no-raw
+        -> VERIFIED  => load and use; no re-recording
+\end{lstlisting}
+
+Verification is a pure function of the received parameters and the on-chain
+commitment; it requires no trusted third party. If the received parameters were
+altered by even one value, the recomputed hash diverges and verification fails.
+
+\subsection{Scoped access to the parameters}
+
+Anchoring establishes integrity and ownership; it does not move the baseline.
+Sharing the actual parameters is governed by the same scoped, revocable consent
+tokens HealthLog already uses for sessions, with a baseline-specific scope
+ladder: \emph{metadata only} $\to$ \emph{feature schema only} $\to$ \emph{full
+baseline parameters}. The most sensitive scope---handing over the fitted
+model---is opt-in and time-boxed, and the on-chain revocation makes a leaked
+grant detectable.
+
+\subsection{RPC rails: RPC Fast for verification}
+
+The value of anchoring is realized at \emph{verification} time, when an app that
+has never met the user reads the commitment and decides whether to trust a
+baseline. That read must be fast and reliable, which is why RPC Fast---a
+low-latency Solana RPC provider---serves as the production verification rail on
+mainnet. Writing an anchor costs a single memo transaction
+($\approx\!5000$ lamports, sub-cent); reading a commitment is a single
+\code{getTransaction}. Our free demonstration anchors on devnet (public faucet)
+so the full mechanism is exercised end-to-end at zero cost; the anchor and
+verify logic are byte-for-byte identical across networks.
+
+\section{Implementation}
+
+The implementation has three parts, all in the HealthLog repository.
+
+\paragraph{Flutter app (\code{lib/}).} A \code{RpcConfig} centralizes the RPC
+endpoint and is injected at run time via \code{-{}-dart-define}, so an RPC Fast
+API key is never committed. New domain models (\code{WearableBaseline},
+\code{BaselineManifest}) and a \code{BaselineAnchorService} interface with mock
+and devnet implementations mirror the existing session/consent services. A
+\emph{Baseline Passport} screen lets a user load demo EEG/EMG/HRV baselines,
+anchor them, and run the verification checklist. The commitment reuses the app's
+existing canonical-JSON hashing so the Dart and reference implementations share
+one rule.
+
+\paragraph{Reference tool (\code{tools/baseline\_anchor/}).} A small,
+dependency-light Node.js tool (\code{anchor\_baseline.mjs},
+\code{verify\_baseline.mjs}) implements the same canonicalization, the same
+envelope, and a runtime privacy gate that refuses to send any envelope
+containing a payload-shaped forbidden key (model means, covariances, weights,
+scaler statistics, raw beat series, MVC vectors, \ldots) or an over-long numeric
+array. It reads RPC Fast credentials from a local, git-ignored config and signs
+with a local keypair. This tool produced every result in \S\ref{sec:eval}.
+
+\paragraph{Privacy gate and tests.} Both implementations enforce the invariant
+\emph{``the envelope is a commitment plus shape metadata, nothing more''} at
+runtime, and an automated test suite asserts that (i) the commitment is
+deterministic and key-order independent, (ii) no forbidden key or raw value
+appears in the memo text, (iii) a leaky envelope is rejected, and (iv) a
+tampered parameter set fails verification.
+
+\section{Evaluation}
+\label{sec:eval}
+
+\paragraph{Real anchors.} We anchored one baseline of each modality on Solana
+devnet and verified each round-trip. All six checks
+(found on-chain; is a baseline commitment; hash matches; owner matches; within
+horizon; no raw parameters) passed for every baseline.
+
+\begin{table}[h]
+\centering
+\footnotesize
+\begin{tabular}{@{}llr@{}}
+\toprule
+Signal & \code{baselineHash} (prefix) & Env.\ bytes \\
+\midrule
+EEG (gmm-arousal)      & \code{509c8630cca7\ldots} & 476 \\
+EMG (mvc-normalization)& \code{2b9f99cd12d7\ldots} & 482 \\
+HRV (resting-norms)    & \code{929e9e779c58\ldots} & 486 \\
+\bottomrule
+\end{tabular}
+\caption{Baselines anchored on Solana devnet from owner wallet
+\code{EKRgJifhv4xs\ldots s4sg}. Envelopes are $<\!500$ bytes---well within a
+single memo transaction. Full signatures are pinned in the repository README and
+receipts.}
+\label{tab:anchors}
+\end{table}
+
+\paragraph{Tamper detection binds.} Flipping a single GMM weight
+($0.42\!\to\!0.43$, compensated elsewhere) changed the commitment from
+\code{509c8630\ldots} to \code{bf3eee54\ldots}, and verification against the
+unchanged on-chain commitment correctly reported \textsc{failed}. Integrity is
+not advisory; it is cryptographically bound to every value in the parameter set.
+
+\paragraph{Verification latency.} Over eight \code{getSlot} probes against the
+RPC Fast mainnet endpoint we observed 101/106/371\,ms
+(min/median/max), mean 162\,ms, dominated by two cold outliers. A full baseline
+verification is a single \code{getTransaction} of comparable cost plus local
+hashing (microseconds), so a consumer app can gate ``trust this baseline'' on a
+sub-second, one-round-trip check.
+
+\paragraph{Cost.} Anchoring is one memo transaction. On devnet it is free; on
+mainnet it is the base fee ($\approx\!5000$ lamports, well under one US cent),
+paid once per baseline (or per recalibration). Reads are free RPC calls.
+
+\section{Security and Privacy Analysis}
+
+\paragraph{What is and is not on-chain.} On-chain: a hash, an owner wallet, short
+type/model tags, coarse dimensionality, two timestamps. Off-chain and encrypted:
+every fitted value, every feature vector, every raw sample. A hash is a one-way
+commitment; recovering parameters from \code{baselineHash} is infeasible.
+
+\paragraph{Biometric-template leakage under sharing.} The commitment protects the
+data \emph{on the ledger}, but the sensitive scope of the consent flow does hand
+the fitted parameters to a recipient. Fitted model parameters can encode
+identity-linked structure; sharing them is a genuine biometric-disclosure
+decision, not a metadata one. Our design makes that decision explicit,
+time-boxed, and revocable, but does not yet make the shared template
+\emph{cancelable}. Cryptographic template protection (\S\ref{sec:future}) is the
+right long-term answer; until then the honest framing is: anchoring removes the
+\emph{integrity/provenance} risk of portability, while parameter sharing remains
+a consented disclosure.
+
+\paragraph{Linkage and correlation.} Multiple commitments from one wallet are
+publicly linkable, and \code{signal}/\code{dims}/\code{recordedSeconds} leak
+coarse facts (``this wallet has an EEG and an HRV baseline''). A privacy-seeking
+user can anchor under rotating or per-baseline wallets at the cost of a unified
+passport. We treat wallet hygiene as a user-facing choice, surfaced but not
+mandated.
+
+\paragraph{Revocation semantics.} Revocation is a second on-chain event
+referencing the baseline; a correct verifier treats a baseline whose revocation
+it can see as untrusted. Because the ledger is append-only, revocation cannot
+retract data already shared out of band---it can only stop \emph{future} trust.
+This is the standard limitation of public-ledger consent and we state it plainly.
+
+\paragraph{Freshness and drift.} Physiology drifts: an HRV resting baseline ages
+in weeks, an EEG arousal model more slowly. \code{validUntil} encodes a
+recalibration horizon and verification rejects a stale commitment, converting a
+silent correctness bug (using an outdated baseline) into an explicit, checkable
+failure.
+
+\paragraph{Key management.} The owner wallet is the root of authority. In the
+demo it is a device-held keypair; a production deployment should use a hardware
+or mobile-wallet signer. Loss of the key means loss of the ability to revoke or
+re-anchor, though not disclosure of past data.
+
+\section{Limitations and Honest Positioning}
+
+We deliberately avoid overclaiming.
+
+\begin{itemize}
+\item \textbf{Commitment, not proof of quality.} The chain attests that a
+  specific parameter set existed and is owned and unmodified. It does \emph{not}
+  attest that the baseline was computed correctly, from enough data, or without
+  bias. ``This baseline came from $\ge\!5$ minutes of clean EEG'' is a
+  zero-knowledge claim we do not yet make (\S\ref{sec:future}).
+\item \textbf{Memo, not program state.} The current anchor is an SPL-memo
+  transaction, matching the HealthLog MVP. Structured, queryable state
+  (an Anchor program with per-baseline accounts and native revocation flags) is
+  the intended next step; memos are provenance, not a state machine.
+\item \textbf{Cross-language canonicalization.} Our reference and Dart
+  implementations share the canonicalization \emph{rule} (recursive key sort,
+  UTF-8, compact separators). Exact byte-identical hashing across languages
+  additionally requires pinning numeric formatting; a production spec fixes this
+  by hashing a canonical byte serialization of the baseline, and we flag it
+  rather than paper over it.
+\item \textbf{No cryptographic template protection yet.} As above, the sensitive
+  sharing scope discloses a real template.
+\item \textbf{Devnet demonstration.} Reported anchors are on devnet; the mainnet
+  path is a one-line configuration change and a funded key, and RPC Fast is
+  already the live mainnet read rail we measured against.
+\end{itemize}
+
+\section{Related Work}
+
+Our design sits at the intersection of self-sovereign identity and biosignal
+engineering. \emph{Verifiable credentials} and \emph{decentralized identifiers}
+formalize owner-controlled, verifiable claims; we specialize the pattern to a
+mutable, drift-bounded biometric baseline and add a recalibration horizon.
+\emph{Decentralized health-data} efforts typically anchor document hashes or
+access grants; we anchor a \emph{reusable computational artifact}---a
+calibration model---and make its \emph{reuse without re-recording} the goal.
+From the biosignal side, \emph{transfer learning and cross-session calibration}
+for BCIs study how to reduce or transport calibration; our contribution is
+orthogonal and complementary: a portable, verifiable container so a transported
+baseline can be \emph{trusted} by the receiving system. Finally, \emph{biometric
+template protection} (cancelable biometrics, fuzzy commitments) is the body of
+work we point to for hardening the parameter-sharing scope.
+
+\section{Future Work}
+\label{sec:future}
+
+\begin{itemize}
+\item \textbf{Zero-knowledge quality proofs.} Prove ``computed from
+  $\ge N$ minutes of artifact-clean signal'' or ``fit converged'' without
+  revealing the data or the parameters, upgrading the commitment from
+  \emph{it exists} to \emph{it is good}.
+\item \textbf{Anchor program with per-baseline accounts.} Native, queryable
+  state and revocation flags; a public index of ``baselines this wallet will
+  share, and under what scope.''
+\item \textbf{Cancelable-biometric templates.} Share a revocable, non-invertible
+  transform of the baseline so the sensitive scope no longer discloses a
+  reusable template.
+\item \textbf{Cross-app SDK.} A drop-in ``verify \& load a HealthLog baseline''
+  client so any BCI/wearable app can consume portable baselines, turning the
+  passport into an ecosystem rather than a single app's feature.
+\end{itemize}
+
+\section{Conclusion}
+
+Baselines are the hidden tax of consumer neurotechnology: costly to collect,
+slow to change, and trapped in silos. We showed that a baseline can instead be a
+portable, owner-controlled asset by anchoring only its cryptographic commitment
+and a thin metadata envelope on a public ledger, keeping the biometric itself
+encrypted off-chain, and letting any app verify integrity, provenance, and
+freshness before reuse---no re-recording. The mechanism is implemented,
+integrated into HealthLog with RPC Fast as the verification rail, and
+demonstrated end-to-end on real EEG, EMG, and HRV baselines with cryptographic
+tamper detection and sub-second verification. We were equally explicit about what
+remains: quality proofs and template protection are future work, and we resist
+claiming them prematurely. The result is a concrete step toward wearable
+baselines that people \emph{own} and can \emph{carry}.
+
+\begin{thebibliography}{9}
+\footnotesize
+\bibitem{healthlog} HealthLog Protocol, ``User-owned wearable data with
+Solana-based consent and provenance,'' Solana Frontier Hackathon (Colosseum),
+2026.
+\bibitem{vc} W3C, ``Verifiable Credentials Data Model,'' W3C Recommendation.
+\bibitem{did} W3C, ``Decentralized Identifiers (DIDs),'' W3C Recommendation.
+\bibitem{bcitl} V.\ Jayaram et al., ``Transfer learning in brain--computer
+interfaces,'' \emph{IEEE Computational Intelligence Magazine}, 2016.
+\bibitem{cancelable} N.\ Ratha, J.\ Connell, R.\ Bolle, ``Enhancing security and
+privacy in biometrics-based authentication systems,'' \emph{IBM Systems
+Journal}, 2001.
+\bibitem{hrv} Task Force of ESC/NASPE, ``Heart rate variability: standards of
+measurement, physiological interpretation, and clinical use,'' \emph{Circulation},
+1996.
+\bibitem{solana} A.\ Yakovenko, ``Solana: A new architecture for a high
+performance blockchain,'' whitepaper, 2018.
+\end{thebibliography}
+
+\end{document}

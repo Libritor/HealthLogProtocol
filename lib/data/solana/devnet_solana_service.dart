@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:solana/solana.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/config/rpc_config.dart';
 import '../../domain/models/solana_models.dart';
 import 'solana_consent_service.dart';
 
@@ -18,8 +19,10 @@ import 'solana_consent_service.dart';
 /// SessionCommitment and AccessGrant PDAs.
 class DevnetSolanaService implements SolanaConsentService {
   static const _uuid = Uuid();
-  static const _devnetRpc = 'https://api.devnet.solana.com';
-  static const _devnetWs = 'wss://api.devnet.solana.com';
+
+  /// RPC endpoint. Defaults to public devnet; point at RPC Fast via
+  /// --dart-define (see [RpcConfig]) to use it as the write/verify rail.
+  final RpcConfig rpcConfig;
 
   // Persisted across launches so the demo wallet address stays stable.
   static const _walletSeedKey = 'healthlog_devnet_wallet_seed';
@@ -34,8 +37,9 @@ class DevnetSolanaService implements SolanaConsentService {
   String? _walletAddress;
   bool _funded = false;
 
-  DevnetSolanaService({FlutterSecureStorage? secureStorage})
-      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  DevnetSolanaService({FlutterSecureStorage? secureStorage, RpcConfig? rpcConfig})
+      : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+        rpcConfig = rpcConfig ?? RpcConfig.fromEnvironment();
 
   final Map<String, _MemoCommitment> _commitments = {};
   final Map<String, ConsentGrant> _grants = {};
@@ -50,8 +54,8 @@ class DevnetSolanaService implements SolanaConsentService {
 
   SolanaClient _getClient() {
     _client ??= SolanaClient(
-      rpcUrl: Uri.parse(_devnetRpc),
-      websocketUrl: Uri.parse(_devnetWs),
+      rpcUrl: Uri.parse(rpcConfig.httpUrl),
+      websocketUrl: Uri.parse(rpcConfig.wsUrl),
     );
     return _client!;
   }

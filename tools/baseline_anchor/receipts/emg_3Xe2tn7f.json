@@ -1,0 +1,18 @@
+{
+  "network": "devnet",
+  "owner": "EKRgJifhv4xsfRNFnSLY93NDoLVa39udENVQLC59s4sg",
+  "signal": "emg",
+  "model": "emg-mvc-normalization",
+  "modelVersion": "1.0.0",
+  "featureSchema": "semg-2ch-rms",
+  "baselineHash": "2b9f99cd12d7e55c6040cbd9577619f3dd10a7fb13ca605b68bfede68a1e4806",
+  "featureSchemaHash": "a61f7ecb45cfded7784770b6815249fc82534db5fe321edda5b70fd2e7ec8951",
+  "dims": {
+    "features": 2,
+    "clusters": 0
+  },
+  "txSignature": "3Xe2tn7fKmuxvAoXXfiaS5Sx1Pgz9di2hRUJA2bNa7kwMD9EAzonPVsLUDps4AGxjPnP5JvEo2zy5ix1mDU8eLQG",
+  "explorer": "https://explorer.solana.com/tx/3Xe2tn7fKmuxvAoXXfiaS5Sx1Pgz9di2hRUJA2bNa7kwMD9EAzonPVsLUDps4AGxjPnP5JvEo2zy5ix1mDU8eLQG?cluster=devnet",
+  "ts": "2026-07-31T00:00:00Z",
+  "anchoredAt": "2026-07-31T20:34:25.946Z"
+}

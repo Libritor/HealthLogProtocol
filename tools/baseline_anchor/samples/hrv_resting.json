@@ -1,0 +1,30 @@
+{
+  "_comment": "HRV resting baseline: per-user resting time/frequency-domain norms. Lets stress/recovery apps interpret a live HRV reading relative to the user's own baseline instead of population norms, without a fresh multi-day baselining period.",
+  "baseline": {
+    "restingHrBpm": 58.2,
+    "meanRRms": 1031.0,
+    "sdnnMs": 62.4,
+    "rmssdMs": 48.9,
+    "pnn50": 0.271,
+    "lfMs2": 1180.0,
+    "hfMs2": 940.0,
+    "lfHfRatio": 1.26,
+    "baselineWindowDays": 7,
+    "posture": "seated"
+  },
+  "meta": {
+    "signal": "hrv",
+    "model": "hrv-resting-norms",
+    "modelVersion": "1.0.0",
+    "featureSchema": "hrv-timedomain-v1",
+    "dims": { "features": 8, "clusters": 0 },
+    "recordedSeconds": 604800,
+    "validUntil": "2026-10-31T00:00:00Z",
+    "ts": "2026-07-31T00:00:00Z",
+    "featureSchemaSpec": {
+      "features": ["sdnn", "rmssd", "pnn50", "lf", "hf", "lf_hf", "mean_rr", "resting_hr"],
+      "detection": "R-peak, artifact-corrected",
+      "notes": "Resting norms; a live reading is scored as a z-offset from these. Shorter validUntil reflects faster physiological drift of HRV baselines."
+    }
+  }
+}

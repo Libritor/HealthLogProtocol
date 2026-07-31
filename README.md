@@ -60,6 +60,26 @@ Three real signed memo-program transactions from one demo run, on-chain on Solan
 
 Each transaction's memo payload is a JSON envelope (`{type, manifestHash, rawFileHash, owner, recipient, scope, purpose, expiry, ts}`) so the chain itself carries the consent semantics — no off-chain index required to reconstruct the audit trail.
 
+## Baseline Passport — reuse your BCI without re-recording
+
+Every neurotech and biosignal app re-derives the same thing on first launch: a **per-user baseline**. An EEG BCI fits a personal arousal model; an EMG interface records an MVC trial; an HRV app spends days on resting norms. These baselines are costly, slow-changing, and trapped in whichever app made them.
+
+HealthLog extends the consent layer from *sessions* to *baselines*. You record a calibration **once**, anchor its integrity hash on-chain, and any app verifies + reuses it — no re-recording. Only a SHA-256 **commitment** + shape metadata (`{type: baseline_commitment, signal, model, featureSchema, baselineHash, dims, validUntil, ...}`) goes on-chain; the fitted parameters (GMM state / MVC levels / HRV norms) stay encrypted on your device.
+
+- **Dashboard → Baseline Passport** loads demo EEG/EMG/HRV baselines, anchors them, and runs a 6-point verification checklist.
+- **RPC Fast** is the mainnet verification/production rail (`RpcConfig`, injected via `--dart-define` so the key is never committed); the free demo anchors on devnet.
+- Reference tool + paper: [`tools/baseline_anchor/`](tools/baseline_anchor/README.md), [`paper/baseline_anchoring/main.tex`](paper/baseline_anchoring/main.tex).
+
+**On-chain proof (Solana devnet, 2026-07-31)** — three real baseline commitments from wallet [`EKRgJifhv4xsfRNFnSLY93NDoLVa39udENVQLC59s4sg`](https://explorer.solana.com/address/EKRgJifhv4xsfRNFnSLY93NDoLVa39udENVQLC59s4sg?cluster=devnet):
+
+| Baseline | `baselineHash` | Solana Explorer |
+| --- | --- | --- |
+| EEG (gmm-arousal) | `509c8630cca7…` | [view](https://explorer.solana.com/tx/5JsYqPH3QbEyvFc5FoEnWDHwo83wgDJh1nbA9zqwcKKf3igrnk6uqmTCdzzdARx2tvpQKyuEqSs4mQPS5XhewMzK?cluster=devnet) |
+| EMG (mvc-normalization) | `2b9f99cd12d7…` | [view](https://explorer.solana.com/tx/3Xe2tn7fKmuxvAoXXfiaS5Sx1Pgz9di2hRUJA2bNa7kwMD9EAzonPVsLUDps4AGxjPnP5JvEo2zy5ix1mDU8eLQG?cluster=devnet) |
+| HRV (resting-norms) | `929e9e779c58…` | [view](https://explorer.solana.com/tx/Nqk4WXAS42qyTf26b7wLwAXoRk635p8SL71mypeWF2vF7QENi7mv5x9YCVZJAk5nUaxwujbvE4Wqx4LTgPkgAa2?cluster=devnet) |
+
+All three round-trip **VERIFIED**. Flipping one GMM weight changes the commitment and verification correctly **FAILS** — integrity is bound to every parameter value.
+
 ## What's real now
 
 - **MuseLog ingest**: import any `muse_session_*.csv` (Muse 2 / Muse S / Muse S Athena). Live BLE recording also wired through the existing platform-channel scaffolding.

@@ -1,0 +1,18 @@
+{
+  "network": "devnet",
+  "owner": "EKRgJifhv4xsfRNFnSLY93NDoLVa39udENVQLC59s4sg",
+  "signal": "hrv",
+  "model": "hrv-resting-norms",
+  "modelVersion": "1.0.0",
+  "featureSchema": "hrv-timedomain-v1",
+  "baselineHash": "929e9e779c58c579f9d64b11ef731fe9db9f4f9e94310b087f106bd059147679",
+  "featureSchemaHash": "e925fd1e47e134d91da1dbd2628f16d1a54cb7ef5e00fc71d5a0e2d23ca77200",
+  "dims": {
+    "features": 8,
+    "clusters": 0
+  },
+  "txSignature": "Nqk4WXAS42qyTf26b7wLwAXoRk635p8SL71mypeWF2vF7QENi7mv5x9YCVZJAk5nUaxwujbvE4Wqx4LTgPkgAa2",
+  "explorer": "https://explorer.solana.com/tx/Nqk4WXAS42qyTf26b7wLwAXoRk635p8SL71mypeWF2vF7QENi7mv5x9YCVZJAk5nUaxwujbvE4Wqx4LTgPkgAa2?cluster=devnet",
+  "ts": "2026-07-31T00:00:00Z",
+  "anchoredAt": "2026-07-31T20:34:27.405Z"
+}
