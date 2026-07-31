@@ -345,6 +345,16 @@ verification is a single \code{getTransaction} of comparable cost plus local
 hashing (microseconds), so a consumer app can gate ``trust this baseline'' on a
 sub-second, one-round-trip check.
 
+\paragraph{Reuse without re-recording (the payoff).} A consumer that verifies a
+baseline can immediately \emph{use} it. We implement the consumer side as a
+self-contained full-covariance GMM evaluator (the same log-Gaussian form the
+app's calibration uses) that standardizes a fresh feature vector with the
+baseline's own scaler and returns an arousal label. Feature vectors placed at a
+cluster's mean classify to that cluster's label (high$\to$high, low$\to$low,
+medium$\to$medium; responsibilities sum to one), all under automated test---so a
+second app runs inference from a verified baseline it never recorded, which is
+the entire point.
+
 \paragraph{Cost.} Anchoring is one memo transaction. On devnet it is free; on
 mainnet it is the base fee ($\approx\!5000$ lamports, well under one US cent),
 paid once per baseline (or per recalibration). Reads are free RPC calls.

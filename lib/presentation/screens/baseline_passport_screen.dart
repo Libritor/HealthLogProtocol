@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
+import '../../data/arousal/model_state_loader.dart';
+import '../../data/baseline/baseline_reuse_service.dart';
 import '../../domain/models/baseline_models.dart';
-import '../../features/arousal/data/gmm_calibration_service.dart';
 import '../providers/baseline_providers.dart';
 
 /// The "baseline passport": record a wearable baseline once, anchor its
@@ -19,6 +20,8 @@ class BaselinePassportScreen extends ConsumerStatefulWidget {
 class _BaselinePassportScreenState
     extends ConsumerState<BaselinePassportScreen> {
   final Map<String, BaselineVerification> _verifications = {};
+  final Map<String, BaselineReuseResult> _reuse = {};
+  final BaselineReuseService _reuseService = BaselineReuseService();
   bool _busy = false;
 
   /// Demo parameter sets — the private, off-chain calibration payloads. These
@@ -30,6 +33,16 @@ class _BaselinePassportScreenState
       'scalerMean': [12.41, 9.83, 6.12, 2.07],
       'scalerScale': [3.11, 2.44, 1.63, 0.58],
       'gmmWeights': [0.42, 0.35, 0.23],
+      'gmmMeans': [
+        [-0.81, 0.62, -0.44, -0.70],
+        [0.10, -0.05, 0.08, 0.02],
+        [0.79, -0.61, 0.55, 0.83],
+      ],
+      'gmmCovariances': [
+        [[0.55, 0.02, 0.01, 0.00], [0.02, 0.48, 0.00, 0.01], [0.01, 0.00, 0.51, 0.02], [0.00, 0.01, 0.02, 0.44]],
+        [[0.61, 0.01, 0.00, 0.02], [0.01, 0.59, 0.01, 0.00], [0.00, 0.01, 0.63, 0.01], [0.02, 0.00, 0.01, 0.57]],
+        [[0.49, 0.03, 0.02, 0.01], [0.03, 0.52, 0.01, 0.02], [0.02, 0.01, 0.47, 0.00], [0.01, 0.02, 0.00, 0.53]],
+      ],
     },
     BaselineSignalType.emg: {
       'channels': ['biceps_brachii', 'triceps_brachii'],
@@ -86,20 +99,19 @@ class _BaselinePassportScreenState
   }
 
   Future<void> _anchorMyCalibration() async {
-    final calib =
-        ref.read(gmmCalibrationServiceProvider).getLastCalibrationResult();
-    if (calib == null) {
-      _snack('No calibration found yet — run MuseLog → Calibrate, then return.',
+    // Read the GmmModelState the calibration flow persisted
+    // (arousal_model_state.json) — camelCase, and directly reusable.
+    final state = await ModelStateLoader().loadModelStateFromFile();
+    if (state == null || state['gmmWeights'] == null) {
+      _snack('No saved calibration found — run MuseLog → Calibrate, then return.',
           error: true);
       return;
     }
     final hashing = ref.read(baselineHashingProvider);
     final wallet = ref.read(baselineAnchorServiceProvider).connectedWallet;
-    final baseline = hashing.fromModelStateJson(
-      calib.modelState.toJson(),
-      ownerWallet: wallet,
-    );
+    final baseline = hashing.fromModelStateJson(state, ownerWallet: wallet);
     ref.read(baselinesProvider.notifier).add(baseline);
+    if (!mounted) return;
     _snack('Loaded your calibrated baseline '
         '(${baseline.dims['features']} features · '
         '${baseline.dims['clusters']} clusters). Tap Anchor to commit it.');
@@ -140,6 +152,32 @@ class _BaselinePassportScreenState
       _snack('Verify failed: $e', error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Consumer-side reuse: run arousal inference from a verified baseline on a
+  /// fresh "elevated arousal" feature sample — no recording, no recalibration.
+  void _runReuse(WearableBaseline b) {
+    final params = b.parameters;
+    if (params == null || params['gmmMeans'] == null) {
+      _snack('This baseline has no GMM parameters to run inference with.',
+          error: true);
+      return;
+    }
+    try {
+      final mean = (params['scalerMean'] as List)
+          .map((e) => (e as num).toDouble())
+          .toList();
+      final scale = (params['scalerScale'] as List)
+          .map((e) => (e as num).toDouble())
+          .toList();
+      // A fresh live sample skewed toward high arousal, in standardized space.
+      const z = [0.7, -0.5, 0.5, 0.8];
+      final raw = List<double>.generate(
+          mean.length, (i) => mean[i] + z[i % z.length] * scale[i]);
+      setState(() => _reuse[b.baselineId] = _reuseService.classify(params, raw));
+    } catch (e) {
+      _snack('Inference failed: $e', error: true);
     }
   }
 
@@ -285,8 +323,55 @@ class _BaselinePassportScreenState
               const SizedBox(height: 12),
               _verificationPanel(theme, verification),
             ],
+            if (verification?.allPassed == true &&
+                b.signalType == BaselineSignalType.eeg) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _runReuse(b),
+                icon: const Icon(Icons.play_circle_outline, size: 18),
+                label: const Text('Reuse: run arousal inference (no re-record)'),
+              ),
+              if (_reuse[b.baselineId] != null)
+                _reusePanel(theme, _reuse[b.baselineId]!),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _reusePanel(ThemeData theme, BaselineReuseResult r) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.solanaPurple, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.insights, size: 16, color: AppColors.solanaTeal),
+              const SizedBox(width: 8),
+              Text('Inference from verified baseline',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Arousal: ${r.arousalLabel.toUpperCase()}  '
+              '(index ${r.arousalIndex.toStringAsFixed(2)})',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.solanaTeal)),
+          const SizedBox(height: 2),
+          Text('Classified a fresh sample with your own baseline — '
+              'no recording, no recalibration.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: AppColors.onSurfaceMuted)),
+        ],
       ),
     );
   }
