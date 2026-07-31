@@ -411,10 +411,13 @@ We deliberately avoid overclaiming.
   attest that the baseline was computed correctly, from enough data, or without
   bias. ``This baseline came from $\ge\!5$ minutes of clean EEG'' is a
   zero-knowledge claim we do not yet make (\S\ref{sec:future}).
-\item \textbf{Memo, not program state.} The current anchor is an SPL-memo
-  transaction, matching the HealthLog MVP. Structured, queryable state
-  (an Anchor program with per-baseline accounts and native revocation flags) is
-  the intended next step; memos are provenance, not a state machine.
+\item \textbf{Memo now, program state next (written, not yet deployed).} The
+  live anchor is an SPL-memo transaction (the MVP). A structured Anchor
+  program---per-baseline PDAs keyed by (owner, baseline hash) with native
+  revocation---is now written and build-ready (\code{anchor/}) but not yet
+  deployed; the memo path remains the tested default. Because the program
+  commits the identical hash, the two are interchangeable, and a verifier reads
+  a PDA instead of parsing a memo log.
 \item \textbf{Cross-language canonicalization (resolved, with a residual edge).}
   The Dart and Node implementations now emit byte-identical canonical strings
   and hashes for realistic baselines, verified by a golden test
