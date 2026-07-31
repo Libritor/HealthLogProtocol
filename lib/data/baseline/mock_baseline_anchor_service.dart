@@ -37,7 +37,8 @@ class MockBaselineAnchorService implements BaselineAnchorService {
 
   @override
   Future<String> connectWallet() async {
-    _wallet ??= 'Mock${_uuid.v4().replaceAll('-', '').substring(0, 40)}';
+    // 32 hex chars after stripping dashes — a stable, wallet-like mock address.
+    _wallet ??= 'Mock${_uuid.v4().replaceAll('-', '')}';
     return _wallet!;
   }
 
