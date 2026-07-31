@@ -54,6 +54,35 @@ class BaselineHashing {
     );
   }
 
+  /// Build an EEG baseline directly from a serialized GMM model state — the
+  /// real output of [GmmCalibrationService] (`CalibrationResult.modelState`).
+  /// This is what turns "my actual calibration" into an anchorable, portable
+  /// baseline instead of demo parameters.
+  WearableBaseline fromModelStateJson(
+    Map<String, dynamic> modelState, {
+    int? recordedSeconds,
+    DateTime? validUntil,
+    String? ownerWallet,
+    DateTime? createdAt,
+  }) {
+    final features = (modelState['featureCols'] as List?)?.length ??
+        (modelState['scalerMean'] as List?)?.length ??
+        0;
+    final clusters = (modelState['gmmWeights'] as List?)?.length ?? 0;
+    return build(
+      signal: BaselineSignalType.eeg,
+      model: 'gmm-arousal',
+      modelVersion: '1.0.0',
+      featureSchema: 'muse-bandpower-$features',
+      parameters: modelState,
+      dims: {'features': features, 'clusters': clusters},
+      recordedSeconds: recordedSeconds,
+      validUntil: validUntil ?? DateTime.now().add(const Duration(days: 365)),
+      ownerWallet: ownerWallet,
+      createdAt: createdAt,
+    );
+  }
+
   /// Recompute a baseline's hash from a candidate parameter set. Used by the
   /// verifier: a consumer re-hashes the parameters it received and checks the
   /// result against the on-chain commitment.

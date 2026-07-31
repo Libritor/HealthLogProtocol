@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_colors.dart';
 import '../../domain/models/baseline_models.dart';
+import '../../features/arousal/data/gmm_calibration_service.dart';
 import '../providers/baseline_providers.dart';
 
 /// The "baseline passport": record a wearable baseline once, anchor its
@@ -82,6 +83,26 @@ class _BaselinePassportScreenState
       ..add(b3)
       ..add(b2)
       ..add(b1);
+  }
+
+  Future<void> _anchorMyCalibration() async {
+    final calib =
+        ref.read(gmmCalibrationServiceProvider).getLastCalibrationResult();
+    if (calib == null) {
+      _snack('No calibration found yet — run MuseLog → Calibrate, then return.',
+          error: true);
+      return;
+    }
+    final hashing = ref.read(baselineHashingProvider);
+    final wallet = ref.read(baselineAnchorServiceProvider).connectedWallet;
+    final baseline = hashing.fromModelStateJson(
+      calib.modelState.toJson(),
+      ownerWallet: wallet,
+    );
+    ref.read(baselinesProvider.notifier).add(baseline);
+    _snack('Loaded your calibrated baseline '
+        '(${baseline.dims['features']} features · '
+        '${baseline.dims['clusters']} clusters). Tap Anchor to commit it.');
   }
 
   Future<void> _anchor(WearableBaseline baseline) async {
@@ -172,6 +193,12 @@ class _BaselinePassportScreenState
             ],
           ),
           const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _anchorMyCalibration,
+            icon: const Icon(Icons.memory, size: 18),
+            label: const Text('Add my calibrated EEG baseline'),
+          ),
+          const SizedBox(height: 10),
           if (baselines.isEmpty)
             FilledButton.icon(
               onPressed: _busy ? null : _loadDemoBaselines,

@@ -170,4 +170,53 @@ void main() {
       expect(result.allPassed, isFalse);
     });
   });
+
+  group('From real GMM calibration', () {
+    // Shape produced by GmmModelState.toJson() (the live calibration output).
+    final modelState = <String, dynamic>{
+      'featureCols': ['theta', 'alpha', 'beta', 'tbr'],
+      'clusterToArousal': {'0': 'low', '1': 'medium', '2': 'high'},
+      'scalerMean': [12.41, 9.83, 6.12, 2.07],
+      'scalerScale': [3.11, 2.44, 1.63, 0.58],
+      'gmmWeights': [0.42, 0.35, 0.23],
+      'gmmMeans': eegParams['gmmMeans'],
+      'gmmCovariances': [
+        [
+          [0.55, 0.02, 0.01, 0.0],
+        ],
+      ],
+    };
+
+    test('fromModelStateJson infers dims and commits the real model', () {
+      final b = baselineHashing.fromModelStateJson(modelState);
+      expect(b.signalType, BaselineSignalType.eeg);
+      expect(b.model, 'gmm-arousal');
+      expect(b.dims, {'features': 4, 'clusters': 3});
+      expect(b.featureSchema, 'muse-bandpower-4');
+      // The commitment is the hash of the real model state.
+      expect(b.baselineHash, baselineHashing.hashParameters(modelState));
+      expect(b.validUntil, isNotNull); // default recalibration horizon set
+    });
+
+    test('the real model parameters never reach the on-chain envelope', () {
+      final b = baselineHashing.fromModelStateJson(modelState);
+      final memo = BaselineManifest(
+        owner: 'W',
+        signal: b.signalType,
+        model: b.model,
+        modelVersion: b.modelVersion,
+        featureSchema: b.featureSchema,
+        featureSchemaHash: b.featureSchemaHash,
+        baselineHash: b.baselineHash,
+        dims: b.dims,
+        recordedSeconds: b.recordedSeconds,
+        validUntil: b.validUntil,
+        ts: b.createdAt,
+      ).toMemoText();
+      for (final k in ['scalerMean', 'gmmMeans', 'gmmCovariances',
+        'clusterToArousal', 'featureCols']) {
+        expect(memo.contains('"$k"'), isFalse);
+      }
+    });
+  });
 }
